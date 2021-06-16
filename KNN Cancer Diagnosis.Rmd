@@ -1,0 +1,225 @@
+---
+title: "Lab 4-1 KNN and Cancer Diagnosis"
+author: "Aaron Tsui"
+output: html_document
+---
+
+### A KNN analysis on a cancer diagnostic data set. (66 points, 17 Questions)
+
+For this homework you will create a KNN classifier for data on breast cancer biopsies.
+Data: Wisconsin Diagnostic Breast Cancer (WDBC) data set. From the UC Irvine Machine Learning Repository, http://archive.ics.uci.edu/ml/index.html
+
+NOTE: Make sure you check that you have the correct data after each step in this file before you move on to the next step. It is not enough to run your code and move on if you don't see an error. Remember, R does not tell you when some "errors" have occurred. You have to tale care and check the results of each step yourself.
+
+First, establish a seed value for the entire lab. This value is used whenever a call to a random process is required.
+
+```{r}
+seed.val <- 1234
+```
+
+Q1(2pts): Read in the data from the file "wdbc_data.csv" and assign it to the variable "df.wdbc".
+
+```{r}
+df.wdbc <- read.csv("wdbc_data.csv", sep=",", header=TRUE)
+
+```
+
+#### Data exploration and transformation.
+
+You can see the dimensions of this data set with the "dim" function. Note: When there are a lot of columns, 32 in this data set, the output of the "head"" function can be hard to read. The "str" function will give a vertical printout of the data set which is easier to read. Use the R console to execute code to do checking that you don't want to include in the R chunks in this file. Remember that the Rmd file is really for formatting your results. You can run a lot of code in the console and aviod "cluttering" up your Rmd file.
+
+
+Q2(2pts): The column "diagnosis" is character data, with levels: "B" for benign, or non-cancerous, and "M" for malignant, or cancerous. Call summary on the diagnosis column to see how many of each are in the data set.
+
+```{r}
+# Malignant Count
+summary(df.wdbc$diagnosis == "M")
+# Benign Count
+summary(df.wdbc$diagnosis == "B")
+```
+
+Q3(2pts): How many benign and how many malignant cases are in this data set?
+> 212 Malignant and 357 Benign
+
+Notice that some of the data is on a very different scale. Do a summary of the entire data set (in the console) and you'll see that most distributions range 0-1, but some are 40-188, and some, such as area_mean, go up to 2501. We will apply a transformation to the data set to scale all values to the same range 0-1. This transformation is a type of "normalization". The formula for normalization is:
+  normalized = (value-min)/(max-min)
+When you normalize or otherwise apply a transformation to your data, be careful that it will not change the proportions of the values. Normalization, standardization, and log are examples of safe transformations to use.
+The following function will do the normalization. Execute the code below so that it will be created in your environment and so you can use it in the next step. Note that you will see this function appear in the environment pane when you have executed its definition code.
+
+```{r}
+normalize.it <- function(vec) {
+    y <- (vec - min(vec))/(max(vec) - min(vec))
+    y
+}
+```
+
+Q4(4pts): Now you will create the normalized data set to use for the KNN classifier. Apply the "normalize.it" function to the dataset- but only to the columns 3 to 32 as we do not want to normalize the id and the diagnosis columns (make sure you know why not). There are three statements to write here.
+
+1- Normalize a subset of the data. Write a call to lapply and pass it a data set you create by selecting all rows and only the columns 3 through 32 (i.e. all columns starting at index 3 and ending at index 32) from df.wdbc, and also pass in the function normalize.it, which was defined above. 
+
+The generalized syntax of the lapply call is:
+lapply ( data, function )
+
+For the data argument, I suggest using a sequence to specify the column selection, such as 3:32. The general formula for selecting all rows and columns the columns from startIndex to endIndex from a dataframe would be:
+
+dataframe[,startIndex:endIndex]
+
+Assign the call to lapply to a variable "wbcd.lst". 
+
+2- Convert list to dataframe. The lapply() function returns a list (that is the "l" in "lapply"), so we have to convert it to a data frame. Write a call to data.frame(), passing in the wbcd.lst variable from step 1. Assign that result to a variable called df.wbcd.normed. That is now our normalized data set that you will use to create a KNN classifier.
+
+3- Note that df.wbcd.normed should not have the id or the diagnosis columns. 
+The "head" function allows you to check that before moving on. Add a statement that calls the head function on the normalized dataframe from step 2.
+
+```{r}
+wbcd.lst <- lapply(df.wdbc[,3:32], normalize.it)
+df.wbcd.normed <- data.frame(wbcd.lst)
+head(df.wbcd.normed)
+```
+
+#### Create train and test sets. Let's use 2/3 for train and 1/3 for test (refer to the text p.78).
+
+In a series of three statements, you will create variables that hold the data size, training set size, and the number of labels in the test set, which is essentially the test set size. It is a good idea to use variables for this purpose as it makes the rest of your code generic; if you want to change the data set, or the proportions of test and train size you only do it at the beginning, and not elsewhere in your code. 
+
+Q5(6pts): 1- First, calculate the data size, i.e. the number of rows, in the normed data set you created in Q4 and assign it to a variable called "data.size". 
+2- Then create a variable called  training.size and assign it to 0.66, which is about 2/3. 
+3- Finally, create a variable "num.test.labels" and assign to it the number of labels in the test data set (this is the number of rows that will be in the test set, or about 1/3 of the data). Use the variables you just created in the first two steps to calculate num.test.labels. This is the size of the entire data set * 1- size of the training set.
+
+```{r}
+data.size <- nrow(df.wbcd.normed)
+training.size <- 0.66
+num.test.labels <- (1- training.size)* data.size
+```
+
+Q6(6pts): Create the training set. This will be done in three steps: 
+1- Call the set.seed function using the seed value for the entire lab. This statement should be entered below the statement RNGversion("3.4.3") so your results will agree with the solution code.
+
+2- Assign to a variable "train.row.nums" the row numbers to be used in the training set, selected by random. Call the sample function. The sample function takes three arguments in this call:
+      sample(range of numbers to sample from, number of samples to take from that range, sampling mode)
+
+The first argument is the sequence 1:the size of the data (use the variable for that from Q5). The second argument is the product of the size of the data and the proportion of the training size you want (the variable train.size). The third argument sets the replace parameter to the value FALSE, or sampling without replacement. Be sure you know why you would want to sample without replacement!
+
+3- Obtain the training set. Assign to the variable train.data the rows sepcified by train.row.nums from the normed dataframe, df.wbcd.normed. You want all of the columns. Using the index notation to select specific rows and all columns:  
+            dataframe[row numbers, ]
+
+```{r}
+RNGversion("3.4.3")
+set.seed(seed.val)
+train.row.nums <- sample(data.size,   data.size*training.size, replace = FALSE)
+train.data <- df.wbcd.normed[ train.row.nums ,]
+
+```
+
+Q7(4pts): Create the test set in a similar way. First create a vector that specifies the rows you want to be in the test set. This set should contain all of the rows that are not in the training set. This can be seen as the set difference (like subtraction for sets) between the data and the training data:  test set rows = data set rows - train set rows
+
+Use the setdiff function to create this vector and assign it to a variable called test.row.nums.
+You pass in two arguments to setdiff: a sequence from 1 to the data.size, and the training row numbers, train.row.nums, to get the test row numbers. Thus, you are passing in two vectors, and the result will be a vector.
+Finally, assign to the variable test.data the rows specified by test.row.nums. Use the normed data set. Get all columns.
+
+```{r}
+test.row.nums <- setdiff(1:data.size,train.row.nums)
+test.data <- df.wbcd.normed[test.row.nums,]
+
+```
+
+Q8(2pts): How many rows are in the training data set and the test data set?
+> train:   375  test: 194
+
+
+Q9(4pts): Get the training and test set labels. Create a variable called class.labels and assign to it the values for diagnosis for the row numbers specified by train.row.nums. Create a variable called true.labels and assign to it the values for diagnosis for the row numbers specified by test.row.nums.
+Remember that the diagnosis cilumn was not included in the normalized data set, so use the df.wdbc data frame here.
+
+```{r}
+class.labels <- df.wdbc$diagnosis[train.row.nums]
+true.labels <- df.wdbc$diagnosis[test.row.nums]
+```
+
+#### Choose k, do modeling with knn, predict(classify) and evaluate.
+
+Q10(2pts): Next choose a number for k, the number of nearest neighbors. One "rule of thumb" is to set k to be the nearest integer to the square root of the size of the training set. Make sure to call the "floor" function on the call to sqrt so the value of k is an integer. Use the train.data size in the calculation. Write and execute this statement. K should be 19.
+
+```{r}
+k <- floor(sqrt(nrow(train.data)))
+k
+```
+
+Q11(2pts): Load the library, "class"", for knn, then call the knn function and assign the result to the variable knn.pred. The knn function takes four arguments. Make sure all of the values you are passing in to knn are correct. Do not include the statement to install the package in this file.
+
+```{r}
+library(class)
+knn.pred <- knn(train.data, test.data, cl=class.labels, k=k)
+# could alternatively do knn.pred <- knn(train.data, test.data, cl=class.labels, k=19)
+```
+
+Q12(4pts): Calculate the misclassification rate. The misclassification rate is
+the number of rows where the knn prediction does not match the true labels.
+Print the rate. It should be about 4.1%.
+
+```{r}
+num.incorrect.labels<- sum(knn.pred!=true.labels)
+misc.rate <- num.incorrect.labels/num.test.labels
+misc.rate
+
+```
+
+Q13(2pts): Create a confusion matrix using the table function and assign it to a variable called "conf.matrix". Also print the table. You should have 116 correct benign classifications and 70 correct malignant classifications.
+```{r}
+conf.matrix <- table(knn.pred, true.labels)
+conf.matrix
+
+```
+
+Q14(6pts): Explain the results in this table using the following terminology. 
+Use this terminology (we assume Malignant is a "positive" result):
+A true positive: the model and true label = Malignant.
+A false positive: the model = Malignant and true label = Benign 
+A false negative: the model = Benign and true label = Malignant
+A true negative: the model and true label = Benign
+
+For each cell in the table, state which of the above terms it represents and the number of times this occurred. Then state what you think of this model's classification performance.
+
+>true positive: There are 116 classifications that correctly classified a data point as benign.
+false positive:  There are 5 occurrences that incorrectly classified a data point as benign.
+false negative: There are 3 occurrences that incorrectly classified a data point as malignant.
+true negative: There are 70 classifications that correctly classified a data point as malignant.
+This model's classification performance is pretty good, it made very few errors, not even close to 10% of the data set in both Benign and Malignant subsets.
+ 
+
+Q15(4pts): What is the percentage of false negatives? Why would this be of special concern from a doctor or patient's point of view?
+> 3/70 = 4.285%. This would be a special concern from a doctor or patient's POV because they would prescribe medicine or treatment that a patient doesn't need just over 4 percent of the time, which is bad.
+
+#### Explore other values of k.
+
+Q16(10pts): We calculated the misclassification rate for k=19 (in Q10-12). Is there a value for k that would result in a lower misclassification rate? 
+Using a "for" loop, run knn on values of k from 1 to 20 (use k as the loop index). Declare an empty vector, call it "results", before the loop, then update it in the loop with the misclassification rate for each value of k. In the loop, you will need to do:
+1- call knn to get the predicted labels (see Q11 for reference).
+2- calculate the misclassification rate (see Q12 for reference).
+3- add the misclassification rate to the results vector. Use the loop counter k as the index for adding to the results vector.
+
+After the loop finishes, you have the vector "results" which contains 20 misclassification rates for the values of k from 1 to 20.
+
+```{r}
+results<-c()
+for (k in 1:20) {
+  knn.pred<-knn(train.data, test.data, class.labels, k)
+  num.incorrect.labels<- sum(knn.pred!=true.labels)
+  misc.rate <- num.incorrect.labels/num.test.labels
+  results[k]<-misc.rate
+}
+```
+
+Determine the lowest misclassification rate and the corresponding value of k from the results vector. In the case of a tie, use the earliest (lowest) value of k. Use the R console to run ay statements to help you do this; do not include the code you use to do this in this file. 
+
+Q17(4pts): State the lowest misclassification rate and the corresponding value of k below.
+>  The lowest misclassification rate is 0.01550708 or 1.550708% and its corresponding value of k is 5.
+
+
+
+
+
+
+
+
+
+
+

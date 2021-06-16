@@ -1,0 +1,184 @@
+---
+title: "Lab- Using a Web API"
+author: "Aaron Tsui"
+date: "2/26/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Using R to obtain crime-related data from a web API (13 questions, 41 points).
+
+In this activity you will access crime data from the Web API provided by a police website in the United Kingdom (UK). You can view the public web site for more info: https://www.police.uk/
+
+In general, querying a Web service API typically involves the following steps:
+1. Submit the request.
+2. Check for any server error.
+3. Parse the response.
+4. Convert to a form that can be processed with R such as a data frame.
+
+In this activity, you will make several data requests:
+
+1. Make a GET request to view the crime categories in the site's database.
+/////
+2. Make a GET request to view the names of ploice forces
+/////////////////
+
+Note that many APIs require authentication and the establishment of credentials. The API we are accessing does not require this step.
+
+If you haven't already installed the "httr" and "jsonlite" packages, do so now by executing the install.packages function for each package in the R console.
+
+Note: If you have a problem installing R packages, you may need to update the "pkgconfig" library:
+For example, if you see this error:
+namespace ‘pkgconfig’ 2.0.1 is being loaded, but >= 2.0.2 is required
+try:
+install.packages("pkgconfig")
+
+
+```{r include=FALSE}
+# Execute these statements to load the required libraries:
+library(httr)
+library(jsonlite)
+library(tidyverse) # used for the count function in Part 3
+library(formattable) # use to display a nice table.
+```
+
+### API Documentation.
+
+You will need to consult the public documentation for the police.uk web API: https://data.police.uk/docs/
+
+You can see a list of the kinds of data you can access, example requests, and how to interpret the results.
+
+Since we don't need authentication credentials to access the data on this site, we can execute GET commands by passing in the url and parameters without any authentication.
+
+## Part 1: Crime Categories.
+
+Q1(2pts): Let's look at the crime categories that are available from this data source. Go to the API documentation page and click on the "Crime categories" link. Copy and paste the example request into the GET function parameter below, and change the date to this year and month. Execute the statement.
+
+```{r}
+resp <- GET("https://data.police.uk/api/crime-categories?date=2021-02")
+```
+
+Q2(2pts): Execute a statement to check if your request was successful. If it wasn't, fix the request until it is successful.
+
+```{r}
+resp
+```
+
+Q3(2pts): Now transform the response into text with the "content" function. Assign the result of the call to the content function to a variable called cat.resp.text. 
+
+```{r}
+cat.resp.text <- content(resp, "text", encoding = "UTF-8")
+```
+
+
+Q4(2pts): Now execute the two statements that will parse the json-formatted text into a data frame. There are two steps:
+1- The jsonlite library function fromJSON will produce a list.
+2- The function as.data.frame will take the list as a parameter and return a data frame. Assign the data frame to a variable called crime.cat.df.
+
+```{r}
+json_list <- fromJSON(cat.resp.text)
+crime.cat.df <- as.data.frame(json_list)
+# or, alternatively:
+# crime.cat.df <- as.data.frame(fromJSON(cat.resp.text))
+```
+
+Q5(2pts): Inspect the data frame by calling the "dim" function, the "names" function, and the "head" function to see what's in this data frame.
+```{r}
+dim(crime.cat.df)
+names(crime.cat.df)
+head(crime.cat.df)
+```
+
+Q6(2pts): How many categories are listed in the entire dataframe? 
+> 15
+
+## Part 2: May the force be with you.
+
+Now you will see a list of the names of the police forces in the police.uk database.
+Click on the "Forces" link on the API documentation page.
+
+Q7(5pts): Write and execute the following statements:
+1. Execute a GET request using the example request url on the Forces page.
+2. Check the status of your request and make sure it is sucessful before proceeding.
+3. Write two statements that result in a data frame. Assgn it to a variable called crime.force.df.
+
+```{r}
+resp <- GET("https://data.police.uk/api/forces")
+resp
+crime.force.df <- as.data.frame(fromJSON(content(resp, "text", encoding = "UTF-8")))
+```
+
+Q8(2pts): Display the id column of all forces in the crime.force.df data frame.
+
+```{r}
+crime.force.df$id
+
+```
+
+Q9(2pts): How many forces are there in this database?
+> 44
+
+## Part 3: Crimes by force and date.
+
+This site can provide various crime data based on location, police force, crime category and date.
+
+Q10(5pts): Go to the "Crimes with no location" page on the API documentation site. Use the Example request as a template for your query. Change the "force" parameter value to "city-of-london" and the "date" parameter value to January 2019. (Note that you use the string from the id column, not the name column from the result in Part 2). Execute the GET request, check for success, create a data frame called crime.london.df
+
+```{r}
+resp <- GET("https://data.police.uk/api/crimes-no-location?category=all-crime&force=city-of-london&date=2019-01")
+resp
+crime.london.df <- as.data.frame(fromJSON(content(resp, "text", encoding = "UTF-8")))
+```
+
+Q11(5pts): Using the result from the request above, create and display a barplot that shows the frequencies (occurrences) of crime categories with 4 or more occurrences. You must create a data frame called count.top.df so that the ggplot code below will render a bar chart with the correct data (There should be five bars in the chart).
+
+How to do this? It's a bit tricky, and can be done in several ways. 
+The crime.london.df data frame has a category column. You want to get counts of the frequencies of the unique categories in this data. Previously, we have used the table function to do this. We could select only those categories with frequencies of 4 or more from the table and plot with the base R barplot funtion. This does not produce a very nice chart as some of the column names may not display when you knit.
+
+The code to render a nicer bar chart in ggplot is provided below. It requires a data frame called count.top.df. You can create this data frame with the following two statements:
+
+1- Use the count function with the crime.london.df as a parameter and the vars parameter equal to category (the column you want counted). This call returns a dataframe with counts of the crime categories with two columns. The column n holds the counts.
+2- Use the subset function, passing in the data frame from step 1 as the first argument, and in the second argument, specify that only values of n greater than or equal to 4 should be in the return. Assign the result of the call to subset (ref: Lab 2-2 Q6) to the variable count.top.df and you should be good to execute the bar plot. You should see five bars.
+
+Remember, you can use the R console below as a "scratchpad" to execute statements that do not belong in the markdown chunks. 
+
+```{r}
+four_plus_cats <- count(crime.london.df, vars= category)
+count.top.df <- subset(four_plus_cats, n >= 4)
+
+
+p <-ggplot(count.top.df, aes(vars, n))
+p +geom_bar(stat = "identity")+ xlab("crime category") + ylab("N") 
+```
+
+## Part 4: Crimes by location.
+
+In this part, you will get data about reported bicycle thefts in the city of Leeds, a major city in Yorkshire in northern England from January 2019. This is not the most dramatic crime category (see the list of categories from part), but it will do for now.
+
+Click on the "Street-level crimes" link on the API documentation site and use the "Example request for a "Specific point" request url as a template.
+
+Replace the all-crime parameter with the bicycle theft category (see Part 1 for the exact string to use). Use January 1, 2019 as the date.
+
+Next, you'll need to find the latitude and longitude for the city of Leeds in the UK. For that, you can visit this site:  https://www.latlong.net/.
+
+Q12(5pts): When you have all of the parameter values, execute a get request, check for success, and create a data frame from the response called bicycle.leeds.df.
+
+```{r}
+resp <- GET("https://data.police.uk/api/crimes-street/bicycle-theft?lat=53.800755&lng=-1.549077&date=2019-01")
+resp
+bicycle.leeds.df <- as.data.frame(fromJSON(content(resp, "text", encoding = "UTF-8"), flatten = TRUE))
+```
+
+Q13(5pts): Finally, make a data frame that is a subset of bicycle.leeds.df. Use the select parameter to select only the two columns "location.street.name" and "outcome_status.category". Call the formattable function, passing in the resulting data frame returned by subset. This will display the subset data frame as a formatted table. 
+Optional: format the alignment of the table cells to be left-justified with the align parameter.
+
+```{r}
+subsetBL <- subset(bicycle.leeds.df, select=c("location.street.name", "outcome_status.category"))
+formattable(subsetBL, align = "l")
+
+
+```
+

@@ -1,0 +1,133 @@
+---
+title: "INFO 248 Semester Project"
+author: "Aaron Tsui, Swarathmika Kakivaya"
+date: "May 4th, 2021"
+output: html_document
+---
+
+### Dual-county six-week regression model and hypothesis testing on COVID-19 fatality data in Massachusetts and California
+
+#### Datasets
+
+```{r}
+ma.df <- read.csv("massms.csv", sep=",", header=TRUE)
+ca.df <- read.csv("calisd.csv", sep=",", header=TRUE)
+```
+
+
+#### Basic Total Death vs. Date plots
+
+```{r}
+plot(ma.df$date, ma.df$total_deaths, main = "Massachusetts Total Deaths from 10/1/2020 to 1/30/2021", xlab = "Days starting 10/1/2020", ylab = "Total Deaths (separated by county)")
+plot(ca.df$date, ca.df$total_deaths, main = "California Total Deaths from 10/1/2020 to 1/30/2021", xlab = "Days starting 10/1/2020", ylab = "Total Deaths (separated by county)")
+```
+
+#Linear Regression Model made to compare p-values of existing variables to 0.05 to create a better model for MASSACHUSETTS
+
+```{r}
+ma.df.train <- ma.df[1:61,]
+ma.df.test <- ma.df[62:122,]
+fit.train <- lm(total_deaths ~ total_cases+daily_positive_7day_ma+daily_deaths_7day_ma+positivity_rate_7day_ma+prevalence_ratio_mean+rt_mean+new_infected_mean+current_infected_mean, data = ma.df.train )
+summary(fit.train)
+
+
+```
+
+#Improved Regression Model
+
+```{r}
+fit.train <- lm(total_deaths ~ total_cases+positivity_rate_7day_ma, data = ma.df.train )
+summary(fit.train)
+
+```
+
+The effect of positivity_rate_7day_ma going up by 1 point decreases total deaths by 612.1, while total cases going up by 1 point increases total deaths by .01242
+
+```{r}
+
+plot(fit.train$fitted ,fit.train$residuals, xlab = "fitted value", ylab = "residuals", main = "Fitted values VS. residuals") 
+abline(h = 0)
+
+
+
+```
+
+
+
+
+```{r}
+
+
+actual_deaths <- as.vector(ma.df.test$total_deaths)
+pred.ma <- predict(fit.train, ma.df.test, interval="prediction", level=0.95)
+
+#pred.vals.ma<-pred.ma[,1]
+#mse.fit.ma <- mean((actual_deaths - pred.vals.ma)^2)
+predicted_deaths <- pred.ma[,'fit']
+
+mse.test <- mean((actual_deaths - predicted_deaths)^2)
+mse.train <- mean(fit.train$residuals^2)
+
+mse.test
+mse.train
+percent_change <- (((mse.train - mse.test)/mse.train) * 100)
+percent_change
+
+t.test(fit.train$residuals, as.vector(actual_deaths - predicted_deaths))
+
+
+```
+Our p-value is greater than 0.05, so we fail to reject the null hypothesis.
+
+
+
+
+#Linear Regression Model made to compare p-values of existing variables to 0.05 to create a better model for CALIFORNIA
+
+```{r}
+ca.df.train <- ca.df[1:61,]
+ca.df.test <- ca.df[62:122,]
+fit.train <- lm(total_deaths ~ total_cases+daily_positive_7day_ma+daily_deaths_7day_ma+positivity_rate_7day_ma+prevalence_ratio_mean+rt_mean+new_infected_mean+current_infected_mean, data = ca.df.train )
+summary(fit.train)
+
+
+```
+
+
+#Improved Regression Model
+
+```{r}
+fit.train <- lm(total_deaths ~ total_cases+daily_positive_7day_ma+daily_deaths_7day_ma+current_infected_mean , data = ca.df.train )
+summary(fit.train)
+
+```
+For every additional point of:
+
+total_cases, total_deaths increases by 1.257e-02.
+daily_positive_7day_ma, total deaths decreases by 1.480e-01.
+daily_deaths_7day_ma, total deaths increases by 3.690.
+current_infected_mean, total deaths decreases by 8.195e-04.
+
+
+```{r}
+
+
+actual_deaths <- as.vector(ca.df.test$total_deaths)
+pred.ca <- predict(fit.train, ca.df.test, interval="prediction", level=0.95)
+
+predicted_deaths <- pred.ca[,'fit']
+
+mse.test <- mean((actual_deaths - predicted_deaths)^2)
+mse.train <- mean(fit.train$residuals^2)
+
+mse.test
+mse.train
+percent_change <- (((mse.train - mse.test)/mse.train) * 100)
+percent_change
+
+t.test(fit.train$residuals, as.vector(actual_deaths - predicted_deaths))
+
+
+```
+
+Our p-value is less than 0.05, so we reject the null hypothesis that the true difference in means is equal to zero.

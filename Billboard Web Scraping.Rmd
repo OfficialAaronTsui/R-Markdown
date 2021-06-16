@@ -1,0 +1,232 @@
+---
+title: "Lab- Web Scraping"
+author: "Aaron Tsui"
+date: "april 29 2021"
+output: html_document
+---
+### Web Scraping with R (8 questions, 40 pts. total).
+
+This lab makes use of the following libraries. Install them if necessary. 
+Remember not to include the installation statements in the Rmd file.
+
+```{r, echo=FALSE, message = FALSE, results = FALSE, warning=FALSE}
+library(rvest)
+library(dplyr)
+# table and other rendering
+library(grid)
+library(gridExtra)
+library(ggplot2)
+```
+
+# Obtaining Data from Web Pages
+In this lab you will connect to a web page and gather data from it. This process requires you to view the structure of the web page in order to discover the identifiers needed to query the data you want. The R library rvest is used to access, read, and parse the web page into a model that can be queried.
+
+For this lab, you will query data from the billboard hot 100 songs chart, located at this url:
+https://www.billboard.com/charts/hot-100
+
+Specifically, you will scrape the following fields from their chart: Rank, Artist, and Song Title.
+
+First, navigate to this url and look at the web page there- especially the hot 100 chart.
+
+You will first use R code to access the data from this page and inspect the document model that is returned. Once you have an idea of that structure, you will use your browser to inspect the HTML elements that identify the data fields we want to scrape. Then you will use those identifiers to extract the data from the document model and compile a dataframe which will be visualized as a table.
+
+#Accessing and Parsing a Web Page
+This code calls the read_html function to read and parse the specified web page. The result is a list object which contains a model of the web page. This model is called the Document Object Model, or DOM. 
+
+```{r}
+pageUrl <- "https://www.billboard.com/charts/hot-100"
+hot100.dom <- read_html(pageUrl)
+```
+
+#Inspecting the DOM:
+Each html tag is an element in the DOM. The term "node" is used as this is a type of network structure, which nodes and their connections to other nodes. The DOM is a type of network in which there are no circular connections. This is called a "tree" model. That means that each node in the DOM has only one parent node. A node may have zero to many child nodes. Each level of the tree is a set of nodes that are nested inside the level above.
+
+Execute this statement to see the first two nodes in the DOM:
+
+```{r}
+hot100.dom
+```
+
+The root node is <html class="" lang="">.
+
+Q1 (5pts): What are the names of the two nodes on the next level of the DOM?
+
+> head and body.
+
+Remember that the DOM is a hierarchical structure- in other words a tree, with nested tags (nodes).
+Each level in the tree is a deeper level of nesting.
+
+You can select a node using html_node("node name") and then see its child nodes using html_children(html node).
+
+This gets all of the nodes inside the <body>......</body> tags in the page:
+
+```{r}
+body_nodes <- html_children(html_node(hot100.dom, "body"))
+body_nodes
+```
+
+Notice the types of tags in this output: div, script, etc. The div tags are where most of the text can be found.
+
+#Using the Pipe Operator.
+
+The pipe operator, %>%, is a useful feature of the dplr library (actually, it's the magrittr library). It can be used for any data analysis purposes. It provides an alternate way of coding when you have several function calls.
+
+The function calls in the code above are nested. This reflects the nested quality of the DOM. To explore further levels in this manner you would have to continue to write nested calls. This is an awkward way to write the code. The pipe operator offers a cleaner way to do this.
+
+This operator is called a "pipe" operator because it routes, or "pipes" the output from one process or function call to another. This avoids the need to write nested function calls.
+
+This statement is equivalent to the statement above:
+
+```{r}
+body_nodes <- hot100.dom %>% 
+ html_node("body") %>% 
+ html_children()
+```
+
+You can read it this way: "To the hot100.dom object, apply the function html_node function (passing to it the argument "body"), and then to the result of that call, apply the html_children function".
+
+An example: get all of the nodes inside all of the body nodes:
+
+```{r}
+children_of_body_nodes <- html_children(body_nodes)
+```
+
+The equivalent code using pipe operators:
+
+```{r}
+children_of_body_nodes <- body_nodes %>%  html_children()
+```
+
+# Extracting the Desired Data 
+
+We want the Rank, Artist, and Song Title from the hot 100 chart on the web page. In order to get these data, we'll need to query the DOM object that was returned from the call to read_html. Specifically, we need to use the identifying name in the DOM for the element that pertains to the data we want.
+
+If this were highly structured data, such as data stored in a relational database, we could read the database schema and write a query to get exactly the data we want. In this case, the data is semi-structured; the page has a coherent structure, but each web page can and mostly does have its own unique way of structuring its data. So, we have to use a tool that can help find the specific name of a tag or attribute that can be used to query that data from the DOM.
+
+The tool to use is an HTML inspector that is provided with most browsers. Navigate the web page you want to inspect, in this case https://www.billboard.com/charts/hot-100, and then open the inspection tool. You can launch the inspector this way:
+
+Chrome:  View/Developer/Inspect Elements
+https://developers.google.com/web/tools/chrome-devtools
+
+Firefox: Tools/Web Developer/Inspector
+https://developer.mozilla.org/en-US/docs/Tools/Page_Inspector/How_to/Examine_and_edit_HTML
+
+-or by selecting the data on the page you want, right click and choose "inspect". This will open the inspector on that element.
+
+Here is a sample of the page source for the chart entry for the top ranked song, "Blinding Lights" by the artist "The Weeknd":
+
+<span class="chart-element__rank flex--column flex--xy-center flex--no-shrink">
+<span class="chart-element__rank__number">1</span><span class="chart-element__trend chart-element__trend--rising color--up"><i class="fa fa-arrow-up"><span class="sr--only">Rising</span></i></span></span>
+ <span class="chart-element__information">
+<span class="chart-element__information__song text--truncate color--primary">Blinding Lights</span>
+<span class="chart-element__information__artist text--truncate color--secondary">The Weeknd</span>
+
+Now, what identifier to use to extract the rank, song title and artist? 
+The tag that contains the song title is:
+<span class="chart-element__information__song text--truncate color--primary">Blinding Lights</span>
+Span tags are like div tags in that they serve to identify a specific line or division in the document. The unique identifier in this tag is the class attribute's value: 
+chart-element__information__song.
+
+Locate that part of the page in your browser tool. Do the same for the rank and artist.
+The identifiers we need are:
+
+chart-element__rank__number
+chart-element__information__song
+chart-element__information__artist
+
+Now that we have this information, we can proceed to extract the data from the DOM.
+One note about the DOM before doing the extraction. The DOM object is not HTML. It is actually structured in an XML format. What is XML? It is another kind of markup language that is used to define semi-structured data so that it can be transmitted and processed by applications.
+
+All you need to know about it right now is that the data is marked up by tags in a similar way to HTML, and so the DOM can be queried using the same identifiers that you saw in the HTML document.
+
+This code will do the extraction using the pipe operator and several function calls. Note that we are using the span and class keywords along with the identifiers in the argument to xml_find_all. 
+
+```{r}
+rank <- hot100.dom %>% 
+  rvest::html_nodes('body') %>% 
+  xml2::xml_find_all("//span[contains(@class, 'chart-element__rank__number')]") %>% 
+  rvest::html_text()
+
+artist <- hot100.dom %>% 
+  rvest::html_nodes('body') %>% 
+  xml2::xml_find_all("//span[contains(@class, 'chart-element__information__artist')]") %>% 
+  rvest::html_text()
+
+title <- hot100.dom %>% 
+  rvest::html_nodes('body') %>% 
+  xml2::xml_find_all("//span[contains(@class, 'chart-element__information__song')]") %>% 
+  rvest::html_text()
+```
+
+What is the data type and size (length) of the fields rank, title, and artist after the code above is executed?
+
+> rank is integer and 100 length, title is string and 100 length, and artist is also string and 100 length.
+
+Q2 (5pts): Now combine into a dataframe called "top100.df".
+
+```{r}
+top100.df <- data.frame(rank, artist, title)
+
+```
+
+You have successfully obtained data from a web page and put it into a dataframe. From this point on you can perform any kind of analysis you choose. In this case, the data is not amenable to statistical analysis, but can be visualized as a table.
+
+#Visualizing the Data
+Q3 (5pts): Display the top 20 rows of the chart in a table. This requires some nested function calls.
+The outer call is to the grid.draw function. The parameter to this call is a call to the tableGrob function. Pass in three arameters to this function: the data- the first 20 rows of the top100 dataframe, set rows to NULL to turn off row names, and the theme parameter should be: theme = ttheme_default(base_size=6). Use ?tableGrob to access the doc page.
+
+```{r}
+grid.draw(tableGrob(top100.df[1:20,], rows = NULL, theme = ttheme_default(base_size=6)))
+
+
+```
+
+##Going Further- Top Songs from the Distant Past
+The billboard site actually provides an extensive database of music going back into the distant mists of time!
+
+Using what you now know about web scraping, obtain the data for the top 100 from the week that includes April 25 from the year 1985.
+
+You will need to form the correct url to access the correct web page from this specific week in time. If you are on the billboard homepage (https://www.billboard.com), select the "Charts" menu, then the "hot 100" under weekly. Select a different week and then look at the url in your browser address bar to see how to form the url you need for the year and date required.
+
+Q4 (5pts): Write that url below:
+
+>https://www.billboard.com/charts/hot-100/1985-04-25
+
+Q5 (5pts): Write the statement to get the DOM object from this page.
+
+```{r}
+pageUrl <- "https://www.billboard.com/charts/hot-100/1985-04-25"
+hot100.dom <- read_html(pageUrl)
+```
+
+Q6 (5pts): Write the code to extract the rank, artist and title the DOM object.
+
+```{r}
+rank <- hot100.dom %>% 
+  rvest::html_nodes('body') %>% 
+  xml2::xml_find_all("//span[contains(@class, 'chart-element__rank__number')]") %>% 
+  rvest::html_text()
+
+artist <- hot100.dom %>% 
+  rvest::html_nodes('body') %>% 
+  xml2::xml_find_all("//span[contains(@class, 'chart-element__information__artist')]") %>% 
+  rvest::html_text()
+
+title <- hot100.dom %>% 
+  rvest::html_nodes('body') %>% 
+  xml2::xml_find_all("//span[contains(@class, 'chart-element__information__song')]") %>% 
+  rvest::html_text()
+
+```
+
+Q7 (5pts): Write a statement that will create a dataframe called top100.1985.df which contains the columns rank, artist, title. Then, write a statement that displays the top 10 songs from 1985 in a table. Use the same calls to grid.draw and tableGrob as in Q3.
+
+```{r}
+top100.1985.df <- data.frame(rank, artist, title)
+grid.draw(tableGrob(top100.1985.df[1:10,], rows = NULL, theme = ttheme_default(base_size=6)))
+
+```
+
+Q8 (5pts): What title and artist was ranked first in that week, year?
+
+> We Are The World, by USA For Africa.

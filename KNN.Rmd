@@ -1,0 +1,276 @@
+---
+title: "Activity- K-Nearest Neighbor"
+author: "Aaron Tsui"
+output: html_document
+---
+
+### K-nearest neighbor. (40 points, 20 Questions)
+
+K nearest neighbor, or KNN is an algorithm that is commonly used to classify or "label"" data. In a classification problem, you are given a set of variables and a label. The variables are the observations that were made, and the label is the category that is assigned to each vector of observations. The goal is to use a model to learn how to associate labels to observed values. Then, the model can make a prediction, or classification, when it is given a new set of observations.
+
+The KNN algorithm assigns a label to a set of features (variables). Note that labels are categorical, not continuous data. Linear regression differs in that it outputs a continuous, numerical value.
+
+KNN is often used for recommendation systems. For example, a movie recommender classifies movies into genres by finding all movies that have similar descriptions. A user can then select a genre and a list will be presented- perhaps weighted by its similarity to the genre. Another approach would be to track the user's selections and recommend movies that have similar fe atures to her past choices.
+
+This activity has two parts. In Part 1, you will manually do a KNN classification on a tiny data set that you will create. This will allow you to inspect the steps in the KNN algorithm. In Part 2, you will use the knn function to train and test its classification on a larger data set.
+
+#### Part1: Manual KNN.
+
+##### Similarity.
+
+Measuring similarity is a crucial aspect of AI and machine learning. In classification, we need a way to determine similarity, or distance, between the vectors of observations we are labeling. A classifier will generally try to find groups of observations that are close to each other. These groups should relate to labels. If not, then the observations are not capturing the properties that the labels represent. It could also be that the labels do not describe an actual phenomenon.
+
+Similarity, or distance can be calculated for numerical as well as discrete values. For continuous values, the euclidean distance is often used.
+
+The general mathematical formula for euclidean distance between points $x_{1}$, $y_{1}$ and $x_{2}$, $y_{2}$ is:  
+
+$~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~$$d_{1,2}$ = $\sqrt{(x_{1} - x_{2})^{2} + (y_{1} - y_{2})^{2}}$
+
+There are many techniques for discrete values. The Hamming distance is often used for non-numeric data. For example, the Hamming distance between two strings is the number of places where the letter or symbols differ.
+s1: "freddy" 
+s2: "teddie"
+hamm(s1, s2)=5
+
+There are many other ways of calculating distance metrics on categorical and numeric data. We will explore this topic some more later on in the course. We will focus on euclidean distance in this activity.
+
+##### Distance Matrix.
+
+How does euclidean distance work on numeric data? The KNN algorithm calculates the distance between all rows of observations in a data set. This produces a distance matrix. The matrix can be used to "look up" the distance between one row of data and another row. 
+
+Once we have a distance metric, euclidean in our case, we can calculate a distance matrix of distances between all data points. Then, for a new point, we can calculate its distance to all other points, find the K nearest points, and assign the most common label to the new point.
+
+The following is a small example of how KNN works, with age and income as the variables, and credit as the label (Refer to the text, ch3, p78 as this code is very similar).
+
+Q1(2pts): Create a data frame using the function data.frame, called cred.data, that contains these vectors:
+ age = 69,66,49,49,58,44
+ income = 3,57,79,17,26,71
+ credit = 'low','low','low','low','high','high'
+ Note: you can use the data.frame method to do this easily.
+ 
+```{r}
+age <- c(69,66,49,49,58,44)
+income <- c(3,57,79,17,26,71)
+credit <- c('low','low','low','low','high','high')
+cred.data <- data.frame(age, income, credit)
+cred.data
+```
+
+The data is a two-dimensional space, each row of two observations is associated with a label. The code below plots the data with the label indicated by symbol type: low=not filled(white), high=filled(black).
+
+```{r}
+plot(cred.data$age, cred.data$income, pch= ifelse(cred.data$credit =="low", 1, 16), xlab="age", ylab="income")
+```
+
+Q2(2pts): Calculate the distances between all points. Use the dist function and pass in all rows and only columns 1:2 from cred.data. (We don't want to include column 3 because it is the label column). The other parameter is to specify the method as euclidean- notice that this is the default as you can see from the doc page for the dist function. What does the function return? Assign the call to dist to a variable named "dm.object".
+ 
+```{r}
+dm.object <- dist(cred.data[,1:2], method = "euclidean")
+dm.object
+```
+
+Q3(2pts): The call to dist results in a distance matrix of size 6X6, since we have 6 data points. Convert the object returned from the call to dist to a matrix. Use the as.matrix function and assign its return to the variable "dm", then print dm. Notice the diagonal values are the distances between the points themselves, which is 0.
+```{r}
+dm <- as.matrix(dm.object)
+dm
+```
+
+##### Classification.
+
+Let's say we want to manually classify data point 4, pretending we don't know it is already labeled as "low". We can look at row 4 in the distance matrix to see how close, or similar data point 4 is to the other data points. Because the matrix is small, we can visually inspect it. 
+
+Q4(2pts): Which data point is the closest to data point 4 and what is its classification?
+
+> Data point 5 and its classification is 'high'.
+
+KNN looks at the k nearest neighbors. If we used k=1, we would classify data point 4 with the same label as the closest point.  
+
+Q5(2pts): Does this label match the true label of data point 4? 
+
+> Yes.
+
+In statistics and data science, we recognize that observations have variance. That's why we don't rely on a comparison with a single data point to make a classification. Using k=1 is not a good idea. What value of k would be best? 
+
+KNN looks at the row in the distance matrix, sorts it in ascending order, takes the first k values, compares the frequencies of their labels and picks the most common label as its final classification. 
+
+Q6(2pts): Using the distance matrix and k=5, what are the frequency counts for labels low and high? What would be the classification for data point 4 using k=5?
+
+> 4 low and 1 high. The classification for Data point 4 using k=5 is low.
+
+Q7(2pts): Using k=3, what three data points would be considered (list their indexes)? What are the label frequencies and what would be the classification for data point 4 using k=3?
+
+> 6, 2, and 5. 2 high and 1 low. Using k=3, the classification would be high.
+
+Q8(2pts): Using k=2, what data points would be considered (list their indexes)? What are the label frequencies and what would be the classification for data point 4 using k=2?
+
+> 6 and 3. 1 low and 1 high. Using k=2, we would flip a coin (I got high).
+
+Q9(2pts): Why would it be advisable to use an odd number for k?
+
+> Because when you use an odd number for k, you always get a majority classification rather than a tie like in Q8.
+
+In the case of a tie, we could break the tie in many ways. Often it is done by a random choice. The choice of k does have an impact on the precision of labeling. 
+
+Q10(2pts): If there were n data points, why not use k = n?
+
+> It would take too much time with data sets that are large in number.
+
+If the data set is dominated by one label, if one label is much more frequent than any other, we can adjust by adding a weight to the neighbors, something like the reciprocal of the distance so closer neighbors count more. The data used here is too small to provide a real example of this, though it served as an introduction to the KNN algorithm.
+
+##### Classifying a new data point.
+
+In the example above, we used all of the data to calculate the distance matrix. When using KNN, we would use some of the data for training, and reserve some for testing. The training phase is really simple- it consists of calculating the distance matrix.
+
+To label a new data point, we would re-calculate the distance matrix including the new data and perform the same steps as above. For example, the statement below adds a 57 year old who makes $37K. Note that the label field is blank- which will result in R using NA as a value. You will see a warning about this. It's ok to ignore it as we know about it. In general, warnings do not stop the code fom executing. Errors, on the other hand, usually mean that the code cannot complete execution.
+
+```{r}
+cred.data<- rbind(cred.data, c(57, 37))
+```
+
+Q11(2pts): Re-run the distance matrix calculation as you did in Q2 and Q3. Display the new distance matrix.
+```{r}
+dm <- as.matrix(dist(cred.data[,1:2], method = "euclidean"))
+dm
+
+```
+
+Q12(2pts): Using k=3, what are the indexes of the three nearest neighbors, what are their labels, and what is the classification for data point 7 using k=3?
+
+> 5, 4, and 2. 2 low and 1 high. Using k=3, the classification for DP7 is low.
+
+
+Q13(2pts): Now set the label in the data set. Assign the seventh row, third column to the label you calculated above.
+
+```{r}
+cred.data$credit[7] <- 'low' 
+```
+
+Now we'll view the data as before with the new data point.
+```{r}
+plot(cred.data$age, cred.data$income, pch= ifelse(cred.data$credit =="low", 1, 16), xlab="age", ylab="income")
+```
+
+#### Part 2: Now let's do KNN on a larger data set.
+
+Q14(2pts): Read in the creditRatings.csv data file with the read.csv function and assign the output to the variable "df.credit".
+```{r}
+df.credit <- read.csv("creditRatings.csv", sep=",", header=TRUE)
+
+```
+
+Inspecting the columns we find a continuous feature "Rating"", but we need a categorical label. The code below does the following: Creates a "CreditLabel" column that assigns "high" to ratings above the median value and "low" to ratings <= median. It finds the median and then uses the cut function to make the values as mentioned. Finally, it makes the CreditLabel column a factor and assigns the proper levels, "low","high", to it. 
+
+```{r}
+median.rating<-median(df.credit$Rating)
+df.credit$CreditLabel<-cut(df.credit$Rating, c(-Inf,median.rating,Inf))
+df.credit$CreditLabel<-factor(df.credit$CreditLabel)
+levels(df.credit$CreditLabel)<- c("low","high")
+```
+
+The choice of using the median as a cut point to make a continuous column into a categorical column with two levels was a somewhat arbitrary decision. The mean could have been used, or perhaps there should be more levels that just "high" and "low". In any case, it is important for the data scientist to be aware that they are making an "arbitrary" choice as to how the labels are generated and that this choice needs to be explained in a description of the methodology final report.
+
+Q15(2pts): State why the median would be a better statistic than the mean of the Rating distribution.
+
+> Because mean is affected by outliers and the median isn't, so the median is a better statistic because it is the exact middle of the data set.
+
+##### Making training and testing sets.
+
+The next step in the classification task is to determine what proportion of the total data set we will use for training and testing. Let's use 75% of the data for training and 25% for testing. 
+
+Next, define variables to store the total data size, the training set size, and the test set size. Use these variables thereafter in the file. Why? Because you can run the same code on a different sized data set without changing any "hard-coded" values. Likewise, for setting the proportion of train and test sets, you have one hard-coded value at the beginning of the file. If yo want to adjust the proportion, you only change it in one place. This avoids errors that could arise from having to make multiple changes throughout the file.
+
+Q16(2pts): In preparation to make the test and training data sets, create variables "data.size" for the total data size, "train.size" for the training set size, and "num.test.labels" for the number of test labels- which is the test data size. The name of this variable will be more meaningful than "test.size" later on.
+
+The size of the data, data.size, is the number of rows in the data frame you read in, df.credit. The training size, train.size, will be 0.75, or 75% of the whole data set. The number of test labels in the test set, num.test.labels, will be the proportion of the test size, which is 1- the training size, multiplied by the size of the data. 
+
+```{r}
+data.size <- nrow(df.credit)
+train.size <- 0.75
+num.test.labels <-  (1 - train.size)*data.size 
+```
+
+The following code creates the training set (see the examples in the text). It creates a vector of row numbers by random sampling from all rows numbers in the data set. It will sample 75% of that range. Note that the call to the (very handy) sample function specifies sampling without replacement.
+
+Then the train.data dataframe is created with the subset function. We only need the Age and Income columns for this example.
+
+Note that the "sample" function uses the random number generator to select a certain number of samples from a data set with or without replacement. We want to set a seed in the random number generator so we could repeat this analysis if needed. 
+
+```{r}
+RNGversion("3.4.3")
+set.seed(123456)
+train.row.nums<-sample(1:data.size, data.size*train.size, replace=FALSE)
+train.data<-subset(df.credit[train.row.nums,], select=c(Age, Income))
+```
+
+The following code creates the test set. First, the vector of row numbers to use in the testing set is obtained. The test row numbers are all of the row numbers in the data set that are not in the training set. This is a set difference operation: test rows = data set rows - train rows
+This operation is carried out by a call to the setdiff function.
+The test row numbers are then used to select those rows from the data set and only columns Age and Income are selected (see the text p78).
+```{r}
+test.row.nums<-setdiff(1:data.size,train.row.nums)
+test.data<-subset(df.credit[test.row.nums,], select=c(Age, Income))
+```
+
+Q17(2pts): Write two statements that get the training and test set label vectors.
+The first statement extracts the train.row.nums from the CreditLabel column in the data set and assigns that vector to the variable "class.labels".
+The second statement extracts the test.row.nums from the CreditLabel column in the data set and assigns that vector to the variable "true.labels".
+Then write two more statements that display the lengths of these vectors (call the length function). The length of true.labels should match the number of rows in the test set and the length of class.labels should match the number of rows in the test set. 
+
+```{r}
+class.labels <- df.credit$CreditLabel[train.row.nums]
+true.labels <- df.credit$CreditLabel[test.row.nums]
+```
+
+##### Run KNN and evaluate
+
+We will use KNN to label the test data set. Let's use k=3, and a distance metric "euclidean". The algorithm finds the k closest neighbors in the train set and assign the label of the majority of those neighbors. We will then compare the assigned labels to the actual labels. Use the R function knn in the "class" library. The documentation can be seen by executing ?knn. The knn function call will use the parameters: train, test, cl, k.
+
+Q18(2pts): Write the call to knn and assign it to a variable called pred.labels. This is an object that is the knn analog to the linear regression model object returned by a call to "lm".
+```{r}
+library(class)
+
+pred.labels <- knn(train.data, test.data, cl=class.labels, k=3)
+```
+
+We'll use the misclassification rate as the evaluation metric.
+
+misclassification rate = 1 - accuracy,
+where accuracy = correctly labeled / total labels
+note that misclassification rate = 1 - accuracy = incorrectly labeled / total labels
+
+The following code calculates the misclassification rate. First, get the number of incorrect labels- the sum of the occurences where the predicted labels do not match the true labels. Then the miscalculation rate is the ratio of incorrect labels over the total number of test labels.
+```{r}
+num.incorrect.labels<- sum(pred.labels!=true.labels)
+misc.rate <- num.incorrect.labels/num.test.labels
+misc.rate
+```
+
+Q19(2pts): Create a "confusion matrix", with the predictions and labels from the test data. This table conveniently shows the true positives, true negatives, false positives, and false negatives.
+Use the table function and pass in the predicted labels and the true labels. Print the table.
+
+```{r}
+conf.mat <- table(pred.labels, true.labels)
+conf.mat
+```
+
+##### Can we do better?
+
+We ran knn with k=3. Is there a better value for k? Let's try of different values for k. The loop below runs knn 20 times on values of k that range from 1 to 20. Each iteration makes a call to knn using the loop index k. 
+It uses a vecotor defined outside the loop to accumulate the results from each iteration.
+
+```{r}
+result.vec<-c()
+for (k in 1:20) {
+  pred.labels<-knn(train.data, test.data, class.labels, k)
+  num.incorrect.labels<- sum(pred.labels!=true.labels)
+  misc.rate <- num.incorrect.labels/num.test.labels
+  result.vec[k]<-misc.rate
+}
+```
+
+Q20(2pts): By inspecting the result.vec values, what is the lowest misclassification rate and what k value corresponds to the lowest misclassification rate?
+
+> The lowest misclassification rate is 0.34 and k=18 corresponds to the lowest misc.rate.
+
+Some questions to think about:
+How could we improve or explore the behavior on the data? We varied the value of k. We could try a different training and test set (don't use the seed). We could also try a larger (or smaller) training set. Think about how varying these aspects of the analysis could affect the misclassification rate.
+One other consideration is that we assigned the labels based on the median of the Rating column. Perhaps there is an underlying process that we are missing. Perhaps we should label the top quartile as "high"?
+

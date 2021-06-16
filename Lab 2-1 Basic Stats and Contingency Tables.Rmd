@@ -1,0 +1,180 @@
+---
+title: "Lab 2-1 Basic Stats and Contingency Tables"
+author: "Aaron Tsui"
+output: html_document
+---
+
+### Part 1: Data Exploration (20 questions, 65 points).
+
+Before you begin, turn off the inline display of output for code chunks.
+Select the dropdown for the settings above (the "gear" icon), uncheck "Chunk Output Inline". The output will now appear in the Plots pane in the lower right. This will not affect the appearance of your knitted file.
+
+Q1(2pts): Read in the FlightDelays.csv data file with the read.table or read.csv function and assign the output to the variable "df.delays".
+
+```{r}
+df.delays <- read.table("FlightDelays.csv", sep=",", header=TRUE)
+```
+
+Q2(2pts): Use the dim and head functions to show the size and first six rows of this data set.
+
+```{r}
+dim(df.delays)
+head(df.delays)
+```
+
+#### Flight Lengths
+
+Q3(8pts): We want to see the stats for flight lengths for carrier AA and then for carrier UA seperately. Write 6 statements:
+1- Use the subset function to select the distribution of FlightLength for only Carrier AA and assign it to a variable called aa.lengths.
+2- Call summary with the variable aa.lengths as its parameter to display the descriptive stats.
+3- Call the sd function on aa.lengths to get the standard deviation for that carrier.
+4- Use the subset function to select the distribution of FlightLength for only Carrier UA and assign it to a variable called ua.lengths.
+5- Call summary with the variable ua.lengths as its parameter to display the descriptive stats.
+6- Call the sd function on ua.lengths to get the standard deviation for that carrier.
+
+Note: the value returned form subset is not a vector (call the class function to see what it is if you want- don't include that in the knitted file though- use the console for that). Since it is not a vector, you will get an error from sd if you pass it something that isn't a vector.
+
+```{r}
+aa.lengths <- subset(df.delays, Carrier == "AA", select = c(FlightLength))
+summary(aa.lengths)
+sd(aa.lengths$FlightLength)
+ua.lengths <- subset(df.delays, Carrier == "UA", select = c(FlightLength))
+summary(ua.lengths)
+sd(ua.lengths$FlightLength)
+```
+
+Q4(2pts): By looking at the summaries generated above, answer the following questions:
+1- Which carrier has a greater range of flight lengths?
+2- Which carrier has greater dispersion (variance) ?
+Write your short response after the arrow below.
+
+> Carrier UA has a greater range of flight lengths and variance.
+
+Q5(4pts): The boxplot function can do the work of showing the distributions for each category of carrier: AA and UA if we pass it a formula. We also get the benefit of visualizing the distributions.
+
+Write one call to boxplot that will generate box plots of the distributions of flight lengths for each carrier. Use the formula FlightLength~Carrier and specify data=df.delays. Add the title:"Flight Lengths" and x axis label "Carrier" and y axis label "Flight Length".
+
+```{r}
+boxplot(FlightLength ~ Carrier, data = df.delays, main= "Flight Lengths", xlab = "Carrier", ylab = "Flight Length")
+
+```
+
+Q6(3pts): Examine the boxplots generated for the flight lengths of the carriers. The boxplots clearly show the interquartile range (IQR) for flight lengths. Which carrier has the smallest IQR? Which has the most outliers? How do outliers affect the standard deviation statistic?
+Write your short response after the arrow below.
+
+> UA has the smallest IQR and the most outliers. Outliers increase the standard deviation.
+
+#### Flight Delays
+
+Q7(4pts): Compute the total delay time for each destination.
+Use the tapply function to do the sum of the Delays for each destination. Lookup the tapply function with ?tapply if necessary. Apply the sum function to the Delay column. The second parameter you pass in to tapply is the "index" or "grouping" column, in this case that would be the Destination column. The tapply function will apply the sum to Delay grouping on the levels of Destination- very nifty! Assign the return of the call to tapply to a variable called total.delays
+
+```{r}
+total.delays <- tapply(df.delays$Delay, df.delays$Destination, FUN = sum)
+total.delays
+```
+
+Q8(4pts): Let's visualize the delays for each destination (destinations are airport letter codes).
+Call the barplot function, passing in the result you calculated above.
+Add the title: "Total Delay per Destination"", and label the x and y axes "Destination" and "Delay" respectively. 
+```{r}
+barplot(total.delays, main = "Total Delay per Destination", xlab = "Destination", ylab = "Delay")
+
+```
+
+Q9(2pts): Alter the plot so that the delays are shown in ascending order- i.e. the longest delay is at the right.
+Hint: use "sort".
+
+```{r}
+barplot(sort(total.delays), main = "Total Delay per Destination", xlab = "Destination", ylab = "Delay")
+
+```
+Q10(2pts): Which destination has the most delays? How do the delays at the this destination compare to the destination with the second most delays?
+Write your short response after the arrow below.
+
+> ORD has the most delays and has more than double the number of delays MIA has (the destination with the second most delays).
+
+### Part 2: Analyzing categorical data for independence: contingency tables.
+
+You will perform a contingency table analysis on two data sets.
+
+##### Industrial Process Data.
+
+Q11(2pts): You will work with the "TestProcessAB" data set. This data set contains the results, "good" or "bad" of making items from two processes A and B.
+Write the statement that reads in the file "TestProcessAB.csv" and assigns it to a variable df.process. 
+
+```{r}
+df.process <- read.csv("TestProcessAB.csv", sep=",", header=TRUE)
+```
+
+Q12(2pts): Create a table from the whole dataframe and assign it to a variable called cont.table and print the table to the console.
+
+```{r}
+cont.table <- table(df.process)
+cont.table
+
+```
+
+Q13(4pts): Inspect the table visually. Do you think there are any dependencies, or are the results independent of the process that generated them?
+Write your short response after the arrow below.
+
+> No, I don't think there are any dependencies.
+
+Q14(2pts): Write the statement that runs the chi-square test on the table.
+
+```{r}
+chisq.test(cont.table)
+```
+
+Q15(2pts): Interpret the results of the chi-square test above. Are the Good and Bad levels independent of the process A and B? Briefly explain why.
+Write your short response after the arrow below.
+
+> Looking at the result, you can see that the p-value in the result is large, p-value = 0.3466, meaning the test is not significantly smaller than .05 and we conclude that there is weak evidence of dependency in the table, meaning that Process A is not related to Process B. We fail to reject the null Hypothesis.
+
+Q16(6pts): Create a bar plot of this table. First, create a vector called colors that has the values: "gray40", "gray90" (use the c() function).
+Then call barplot, passing in the table you created above, set the beside parameter (so the columns are next to each other) to TRUE, and the col parameter to the colors vector. 
+In the last statement, include a legend that identifies the Process. Use the two different colors (or grey shades) for the bars and use the same colors for the legend. Dislay the legend at the top left. This statement will do that: legend("topleft", legend = c("ProcessA", "ProcessB"), fill = colors)
+
+```{r}
+colors <- as.vector(c("gray40", "gray90"))
+barplot(cont.table, beside = TRUE, col = colors)
+legend("topleft", legend = c("ProcessA", "ProcessB"), fill = colors)
+```
+
+##### Flight Delay Data.
+
+Now return to the FlightDelays data set. We want to know if destinations are realted to the number of delays of 30 minutes or more. Recall that the data is in the dataframe df.delays.
+# "realted" should be "related"
+Q17(2pts): Create a table from the columns Delayed30 and Destination, in that order. You may use any way to access the columns- either by column name using the $ operator, or with bracket [] notation. Call the table del.table.
+
+```{r}
+del.table <- table(list(df.delays$Delayed30, df.delays$Destination))
+del.table
+```
+
+Q18(2pts): Run the chi-square test on the table.
+
+```{r}
+chisq.test(del.table)
+```
+
+Q19(4pts): What are your conclusion(s)? Is there a dependency? Explain.
+Write your short response after the arrow below.
+
+> Looking at the result, you can see that the p-value in the result is very small, p-value = 2.469e-06, meaning the test is significantly smaller than .05 and we conclude that there is strong evidence of dependency in the table, meaning that destinations are related to the number of delays 30 minutes or more. We reject the null hypothesis.
+
+Q20(6pts): Create a barplot of the data with the columns beside. Include a legend. The legend will have two titles: "No delay" and "Delay". Use two different colors for the columns and legend. Follow the same format as in Q16: create a colors vector, call barplot, and then add the legend.
+
+```{r}
+colors <- as.vector(c("gray40","gray100"))
+barplot(del.table)
+legend("topleft", legend = c("No delay", "Delay"), fill = colors)
+
+```
+
+
+
+
+
+
+

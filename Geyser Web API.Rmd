@@ -1,0 +1,205 @@
+---
+title: "Activity- Using a Web API"
+author: "Aaron Tsui"
+output: html_document
+---
+
+### Using a Web API: Yellowstone Geyser Data (9 questions, 37 points).
+
+In this activity you will use a couple of R libraries to access data about geyser eruptions in Yellowstone National Park via a web api. Once acquired, the data will be parsed into a form that can be easily dealt with in R: a dataframe.
+
+Before you begin, visit: https://www.nps.gov/yell/learn/nature/hydrothermal-features.htm#geysers  to get a quick overview about the geysers in the park. Remember, a good data scientist always has some idea about the domain they are analyzing. Having even a very cursory understanding of what you are analyzing is invaluable to you when you explore the data, do the technical analysis, and reach meaningful conclusions.
+
+Data about the geysers is collected and is made available to the public through a web API. For information about the API, visit this web page:  
+https://geysertimes.org/api/v5/docs/index.php
+
+We will refer to this information when we pull in data.
+
+#### Using R to obtain data from a web API.
+
+First, you will need to install the "httr" and "jsonlite" packages.
+
+The steps in the process of getting the data are:
+
+* Make a "GET" request to the API to pull raw data into your R environment.
+
+* Check that the transmission succeeded.
+
+* Parse the data from its raw form through JavaScript Object Notation (JSON) into a usable format in R, namely, a data frame. This will entail three R statements.
+
+Note that many APIs require authentication and the establishment of credentials. The API we are accessing does not require this step.
+
+##### Install the "httr" and "jsonlite" libraries. 
+
+In the R console, not in the code chunks in this file, execute the install.packages function to install these two libraries. Use the console to execute install.packages- do not include that in your Rmd file. 
+
+Q1(2pts): Then load these libraries into the environment in the code chunk below.
+
+```{r}
+library(httr)
+library(jsonlite)
+```
+
+##### Executing a GET request.
+ 
+Hypertext Transfer Protocol, HTTP, is a communications protocol for sending and receiving data between a client and a server. A client sends a request for data from a server by sending a GET request (There is also a POST request that is used to send data to the server). A GET request needs a url, or the address of the server, and one or more parameters to tell the server what we want.
+
+For example, on the web page documentation for the geyser API, the url is listed inder "Requests":
+    https://www.geysertimes.org/api/v5
+
+The parameter we will use is "geysers", which is appended to the url. This parameter tells the server to return a list of all geysers and their ID#'s. The complete url for the request would be:
+    https://www.geysertimes.org/api/v5/geysers
+
+Since we don't need authentication credentials to access the data, we can execute a GET command passing in the url alone.
+
+The next part of the activity you will perform 5 steps in the process of getting data from a web API and parsing it into a dataframe.
+
+STEP 1:
+The GET function returns an object that contains meta data and the actual data.
+```{r}
+resp <- GET("https://www.geysertimes.org/api/v5/geysers")
+```
+
+STEP 2:
+The GET request may execute with no apparent error, but the server may have send an error code for various reasons. Therefore, you need to make sure that the data transfer was successful.
+```{r}
+http_status(resp)
+```
+
+Status code 200 means success. Common errors are 404 (file not found) and 403 (permission denied), 500 is a generic failure code (and thus not very helpful). If you see an error check that you have the correct url and parameters.
+
+If all is well, we can proceed with processing the data from its raw form into a data frame. This takes a couple of steps.
+First, examine the contents of the object that contains the data and other information that was sent from the server.
+
+Q2(2pts): Type resp and execute it. This is meta data about the response. 
+Now type names(resp) to see the attributes of the response object. There are 10 attributes.
+The actual data is sent in "byte code", which humans cannot easily read. To see this, type and execute: head(resp$content)
+Using the "head" function ensures that you won't print a large output.
+
+```{r}
+resp
+names(resp)
+head(resp$content)
+```
+
+STEP 3:
+Now, transform the byte code into text. This is accomplished by the httr "content" function. After executing this statement, type resp_text in the R console to see that text. Don't type it in the Rmd doc because it is a large amount of text.
+```{r}
+resp_text <- content(resp, "text", encoding = "UTF-8")
+```
+
+This text is formatted in a specific way called JavaScript Object Notification, or JSON, format. Unlike a data frame, which is a table with rows and columns, JSON format is basically a list of key-value pairs. You can see this by inspecting the json text.
+
+STEPS 4 and 5:
+Now we'll do the final transformational steps by parsing the json formatted text into a data frame. There are two steps:
+1- The jsonlite library function fromJSON will produce a list.
+2- The function as.data.frame will take the list as an argument and return a data frame.
+
+```{r}
+geyser_json <- fromJSON(resp_text, flatten = TRUE)
+geyser.df <- as.data.frame(geyser_json)
+```
+
+
+Q3(2pts): Inspect the data frame by calling the "dim" function, the "names" function, and the "head" function to see what's in this data frame. 
+```{r}
+dim(geyser.df)
+names(geyser.df)
+head(geyser.df)
+```
+
+Q4(5pts): In how many rows does the geyser named "Old Faithful" appear in this data frame?
+Write R statement(s) that calculate and print this number.
+```{r}
+rows_named_OF <- nrow(geyser.df[geyser.df$geysers.name == "Old Faithful",])
+rows_named_OF
+```
+
+#### Getting more specific data.
+
+This data frame shows us data about the names and locations of geysers in Yellowstone park.
+Now let's explore what other data we can get from this web API.
+
+Now that we know how to access geyser data and to transform it into a data frame, we'll execute another GET request with some more specific parameters.
+
+Now assemble a url that will request all entries for the Lone Star geyser between January 1, 2019 1:00:00 AM to March 1, 2019 1:00:00 AM. How to form the correct url? Look at the "Entries" part on the api web page.
+Use this canonical form: 
+
+/entries/fromEpoch/toEpoch[/{geyserID}] 
+
+Also look at the "Examples" at the bottom of the geysers api web page for an actual example. The last example shown the type of request we need to make. Notice that we need to convert the human-readable dates to epoch timestamp format- more on that below.
+
+Note: If you see brackets [  ]  or curly braces { } in documentation, it often means that the thing in the brackets is optional, and the brackets themselves are not part of actual the string or query. These symbols are used in canonical forms. A "canonical" form is like a template or specification for how to write an actual expression. Look at the actual Examples of query strings in the API and you won't see any [ ] or { }.
+
+There are three "ingredients" needed for the request we want to send: start date/time, end date/time, and geyser ID.
+
+Q5(5pts): First, write a statement to find the ID for the Lone Star geyser from the geysers.df data frame. Print the ID.
+```{r}
+LoneStarID <- geyser.df[geyser.df$geysers.name == "Lone Star",]$geysers.id
+LoneStarID
+```
+
+Second, convert the dates given above into epoch timestamp form. You can use this converter for that purpose:  https://www.epochconverter.com/
+
+Use GMT instead of local time.
+
+NOTE: The epoch timestamp you use in your query will be a 10-digit integer.
+
+Q6(5pts): Type in these timestamps below after the arrow:
+
+>January 1, 2019 1:00:00 AM = 1546304400
+March 1, 2019 1:00:00 AM = 1551402000
+
+Q7(5pts): Now assemble the url and execute the GET request. Check the status of response, and follow the remaining steps to end up with a dataframe named "geyser.df.ls".
+Those steps are (you should have five R statements):
+1- Now assemble the url and execute the GET request- see Step 1 above.
+2- Check the status of response- Step 2 above.
+3- Call the "content" function to transform the byte code of the response into text- Step 3 above.
+4- Call the "fromJSON" function to produce a list- Step 4 above.
+5- Call the function as.data.frame to produce the dataframe- Step 5 above.
+
+If you do not get a "Success" status, or if you get an error when you process the dataframe, check that your url is correctly formed. A Success status means the transmission happened, but it does not mean that the data is correct or that any data was transmitted. 
+```{r}
+resp <- GET("https://www.geysertimes.org/api/v5/entries/1546304400/1551402000/75")
+resp
+resp_text <- content(resp, "text", encoding = "UTF-8")
+geyser_json <- fromJSON(resp_text, flatten = TRUE)
+geyser.df.ls <- as.data.frame(geyser_json)
+
+#Q8 Code
+num_LS_rows <- nrow(geyser.df.ls) 
+num_LS_rows
+
+LS_entrants <- geyser.df.ls$entries.entrant
+LS_entrants
+
+LS_observers <- geyser.df.ls$entries.observer
+LS_observers
+
+```
+
+Q8(6pts): How many observations on the Lone Star geyser are in the response? There may be missing data in these results, but who reported (the "entrant" column) and observed  (the "observer" column) the eruptions listed in this data set? Don't include missing data in your answers.
+
+>number of observations: 4
+entrants: mswindle, AngelaT, mhvogel
+observers: Visitor Report, visitor report
+
+Q9(5pts): Now print the dates and times for all eruptions for the Lone Star geyser that were entered. This data is the "entries.timeEntered" column in the geyser.df.ls data frame. 
+
+The values in this column are in unix epoch form, which is not huma-readable.Therefore, you will transform those values to the form: yyyy-mm-dd hh:mm:ss TZ, where TZ stands for time zone. 
+
+On the documentation it states that all times were recorded in 'US/Mountain', or mountain standard time. To convert from epoch format to the required, human readable format, use the following R code:
+     as.POSIXct(as.numeric(YOUR.DATA), origin = '1970-01-01', tz = 'US/Mountain')
+The vector of times entered replaces YOUR.DATA in the statement above.
+
+Your output will be in the form of a vector. We won't worry about formatting that further. The point of this question is to understand some of the ways time data is stored and represented.
+
+```{r}
+LS_epoch <- geyser.df.ls$entries.timeEntered
+as.POSIXct(as.numeric(LS_epoch), origin = '1970-01-01', tz = 'US/Mountain')
+```
+
+
+
+
+

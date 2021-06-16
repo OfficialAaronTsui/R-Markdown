@@ -1,0 +1,217 @@
+---
+title: "Activity - Basic Stats and Plots, Contingency Tables"
+author: "Aaron Tsui"
+output: html_document
+---
+
+### Part 1: A look at basic statistics and plotting in R (11 questions, 22 points). 
+
+In the process of making these plots, you will gain practice manipulating data and performing basic statistical calculations in R. You will also gain experience using some graphing and plotting functions and their parameters. 
+
+There are many libraries that have been written for R. Most of these libraries come with data sets. 
+
+Now, we will use the mtcars data set included in basic R to create a bar graph of how many cars have each number of cylinders.
+
+First, take a look at the dimensions (rows and columns) of the mtcars dataset and view the first 6 rows:
+
+```{r}
+dim(mtcars)
+head(mtcars)
+```
+
+Create the basic descriptive statistics for the entire data set:
+```{r}
+summary(mtcars)
+```
+Notice the number of cylinders is treated like a numerical (continuous) data type, when in fact it is categorical- you don't have 4.5 cylinders in a car. 
+
+Q1(2pts): Change the cyl column to a factor, using the existing numbers as the levels, i.e. you don't need to set levels. Then redisplay the summary.
+```{r}
+factor(mtcars$cyl)
+summary(mtcars)
+```
+Notice the difference in the output of summary for the "cyl" column.
+
+Q2(2pts): Now create a table of the counts of cars with each number of cylinders. Use the table function
+to do this. Pass in the "cyl" column to the table function. Assign the result of this call to the variable "counts".
+Then execute counts so that the table is displayed to the console.
+
+You should have 1 row with the number of cylinders and 1 row of counts: 
+ 4  6  8
+11  7 14
+
+```{r}
+counts <- table(mtcars$cyl)
+counts
+```
+
+Q3(2pts): This table can be directly passed in to the barplot function. Write that statement and include these parameters: title of the plot = "Car Distribution", horizontal axis label = "Number of Cylinders".
+Review past activities or search online for the graphical parameters to use. 
+
+```{r}
+barplot(counts, main = "Car Distribution", xlab = "Number of Cylinders")
+
+```
+
+Q4(2pts): Make the y axis higher by adding this parameter to the barplot parameters: ylim=c(0,20). The c function creates a vector with the values 0 and 20, which are the lower and upper bounds for the vertical axis.
+```{r}
+barplot(counts, main = "Car Distribution", xlab = "Number of Cylinders", ylim = c(0,20))
+ 
+```
+
+Now the question is asked: Do the number of cylinders in a car engine have any
+bearing on gas mileage? We want to visualize the average miles per gallon for
+all cars having the same number of cylinders. A good way to visualize this is with a bar chart. 
+
+First, do some calculations on the data using the tapply function, then generate the bar chart.
+
+We want to group cars by their number of cylinders, then calculate the mean of each group.
+The highly useful function tapply will be helpful for this. This function is one of a group of "apply" functions in R.
+For more on tapply, see: https://www.r-bloggers.com/2009/09/r-function-of-the-day-tapply-2/
+
+The general form of tapply:  tapply(summary var, grouping var, function)
+
+In words, we want to group the data  by the number of cylinders, cyl, then we want to apply the mean function to the mpg values for each group. If you look at the barplot from Q4 above (or type mtcars$cyl in the R console), you can see that there are three groups of cars: those with 4, 6, and 8 cylinders. For each group, we take their mpg and compute the mean value for mpg.
+
+Q5(2pts): Write the call to tapply below using mpg as the summary variable, cyl as the grouping variable, and mean as the function:
+```{r}
+avgmpg <- tapply(mtcars$mpg, mtcars$cyl, mean)
+```
+You should get this output:
+       4        6        8 
+26.66364 19.74286 15.10000 
+
+The output of the call to tapply produces the data we need for the bar graph. 
+
+##### Check your results!!!
+Before we create the bar chart, we will check the results by selecting the cars with 6 cylinders and applying the mean function. The following code uses the subset function along with the select parameter to get the mpg column.
+Run these two statements:
+```{r}
+testdata <- subset(mtcars, cyls=6, select=c(mpg)) 
+mean(testdata$mpg)
+```
+Compare this result with the average mpg for the 6 cylinder group above. It should not match.
+
+R did not indicate any error.
+There are actually two errors in the call to subset above.
+1- The correct column name is cyl, not cyls. R didn't tell us this was wrong! Yikes!
+2- There is also another, hard to see error in the second argument to the subset call. 
+
+Q6(2pts): Write the first statement from above with the correct arguments to the subset function below, before the call to mean.
+Execute both statements, and you should see the correct average.
+
+```{r}
+testdata <- subset(mtcars, cyl == 6, select=c(mpg)) # what is the error here?
+mean(testdata$mpg)
+```
+
+Now you should get the correct result, 19.74286. This is an example of how you can have errors in R code but you don't see any errors! The only way to know there is a problem is if you have problems later on. That means you have to take each step carefully and check the results often. 
+
+Now that we have our data, let's make the plot. 
+
+Q7(2pts): Assign the call to tapply from Q5 to a variable named avgmpg.
+Then, call the barplot function using avgmpg as the first argument, then add the following graphical parameters:
+chart title: "Average MPG per number of Cylinders"
+horizontal axis label: "Number of Cylinders"
+vertical axis label: "Avg MPG"
+Look up the actual names for these graphical parameters if you don't remember them. You can also execute ?plot in the R console below.
+
+```{r}
+barplot(avgmpg, main = "Average MPG per number of Cylinders", xlab = "Number of Cylinders", ylab = "Avg MPG")
+
+
+```
+
+Q8(2pts): Notice the y axis numbers are below the first bar height. Make the y axis a little higher by adding the ylim parameter with a min height of 0 and a max height of 30 to the barplot.
+
+```{r}
+barplot(avgmpg, main = "Average MPG per number of Cylinders", xlab = "Number of Cylinders", ylab = "Avg MPG", ylim = c(0,30))
+
+```
+  
+You have used the tapply function to calculate a statistic (the mean) of mpg for each category (number of cylinders) on the data.
+
+Q9(2pts): What does this view of the data tell us about the relationship between mpg and cylinder numbers?
+Write your short response after the arrow below.
+
+> Cylinders and Avg MPG have an inverse relationship.
+
+### Part 2: Contingency tables (26 points)
+
+The table function is very useful. It provides frequency counts and proportions for two vectors of categorical data.
+
+Let's say we have data about two groups, A and B. The data is categorical in nature- i.e. it has discrete levels. We would like to know if the data we observe is dependent upon the particular group it is a member of.
+
+For example, given poll results that counted the number of males and females who registered for one of three political affiliations: democratic, independent or republican, we would like to know if there is any dependency of political affiliation on gender. In other words, are males or females more likely to affiliate with a particular political party?
+
+Our strategy is to assemble the data into a "contingency table". The term "contingency" means a dependency. A contingency table is a table with groups on one dimension and the observed variables on the other. In this example, the table will have gender as its rows and the political parties as columns.
+
+The cells of the table contain the counts (frequencies) of occurrences of that particular group and variable.
+
+We will construct a contingency table and then test for dependencies in the data. If there are dependencies, we may conclude that party affiliation does depend to some (statistically significant) extent on gender. Otherwise, we conclude that party affiliation is independent of gender (the null hypothesis).
+
+The following code produces a table of the frequencies of affiliations for males and females. The rows have two levels and the columns have three levels (remember, this is categorical data). Each cell is the "observed frequency" of the occurrence of the combination of the row and column value.
+
+```{r}
+data.table <- as.table(rbind(c(762, 327, 468), c(484, 239, 477)))
+dimnames(data.table) <- list(gender = c("F", "M"),party = c("Democrat","Independent", "Republican"))
+data.table
+
+# This function shows proportions, or percentages instead of frequencies:
+prop.table(data.table)
+```
+
+Q10(2pts): What do you notice about these data by inspection (just by looking), specifically about the proportion of party affiliation and gender with regard to Democrats and Republicans? 
+What percentage (state the percentage rounded to the tenths place) of females and males are independent?
+Write your short response after the arrow below.
+
+> You have a higher chance of being a Democrat if you are female than being in any other party. 11.9% and 8.7%.
+
+Next, we will look into how we can quantitatively say that there is a dependency between party affiliation and gender.
+
+### Part 3: Hypothesis testing with Chi Square
+
+Recall that a hypothesis test is a method of applying a test statistic to data sets and interpreting the result in terms of "statistical significance". The hypothesis test starts with a hypothesis, called the "null" hypothesis, that can be accepted or rejected based on the interpretation of the distribution of the statistic. The null hypothesis can be rejected if the result shows that the null hypothesis is statistically unlikely to occur. Usually, this threshold is 5%, meaning that 95% of the time the null hypothesis is false.
+Note that this does not mean that the null hypothesis is false, just that is almost always false!
+
+The chi-squared statistic can be used to test the significance of an association between samples of two (or more) categorical variables (factors). This is called a "test for independence". The chi-suare statistic acan also be used for testing the goodness of fit of a data model.
+Reference: https://www.statisticshowto.com/probability-and-statistics/chi-square/
+
+The association between factors is based upon comparing "observed frequencies" at each combination of factor levels, with "expected frequencies" that are averages of observed frequencies over combinations of factor levels. 
+
+Each cell in the table has count N<sub>ij</sub> where i=row, j=col (the observed frequency)
+N<sub>i</sub> = sum of all counts in the row
+N<sub>j</sub> = sum of all counts in column
+N is the total number of observations in the table.
+The expected value for a cell is E<sub>ij</sub> = N<sub>i</sub> * N<sub>j</sub> /N
+
+Chi-square is the sum over all cells of: (observed-expected)^2/expected
+
+We state a "null hypothesis", H<sub>0</sub>, that there is no significant difference between the observed and expected frequencies, and an "alternate hypothesis", H<sub>a</sub>, that there is a significant difference.
+
+If the chi-square value is greater than a "critical" value given a confidence level, we reject the null hypothesis, otherwise we accept the null hypotheis. A typical confidence value is 95%. 
+
+Use the chi-square statistic to investigate the question of if there is any dependency between party affiliation and gender in data.table from above.
+
+Q11(2pts): Call the chisq.test function passing the data.table object to it.
+
+```{r}
+chisq.test(data.table)
+```
+This statement performs the calculations of expected values and chi-square statistic. It also prints out the significance test for 95%. In other words, we are saying that there is a 5% chance that we would observe an independent value- that there is no relationship between gender and party. This confidence is described by a "p-value" of less than .05. This refers to a part of the distribution of the chi-square statistic. 
+
+Looking at the result, you can see that the p-value in the result is very small, p-value = 2.954e-07, meaning the test is significantly smaller than .05 and we conclude that there is strong evidence of dependency in the table, meaning that political affiliation is related to gender. Recall that the null hypothesis is that there is no relationship. Thus, we accept the alternate hypothesis, H<sub>a</sub>.
+
+The degrees of freedom, the number of dimensions needed to calculate a value in the table, is calculated by (number of rows-1)*(number of columns-1). This is also taken into consideration in the significance test.
+
+A barplot of the data is provided below as an example of the use of graphical parameters. A vector of two gray-scale colors is created, then used in the barplot function. A legend is also added to annotate the columns.
+This is a useful site for graphical parameters in basic R:
+http://www.statmethods.net/graphs/bar.html
+
+```{r}
+colors <- c("gray40", "gray90")
+barplot(data.table, beside=TRUE, col = colors, ylim=c(0,800))
+legend("topright", legend = c("Female", "Male"), fill = colors)
+```
+
+

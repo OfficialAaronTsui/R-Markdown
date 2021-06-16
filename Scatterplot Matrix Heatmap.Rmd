@@ -1,0 +1,123 @@
+---
+title: "Activity- Scatterplot Matrix and Heat Maps"
+author: "Gordon Anderson"
+output: html_document
+---
+
+### Scatterplot Matrix
+
+A quick way to view the relationships between several columns in a data set is by generating a scatterplot matrix. This is easily produced with a call to plot in basic R.
+
+The data are results from a Java programming course survey including the final exam scores.
+CLASS_LVL: 1st-year, 2nd-year, 3rd-year, 4th-year
+GENDER: female, male
+PREV: previous programming experience- none, some, java
+MAJOR: ChemBiochem, Biology, OtherLifeSci, GeoPhysicalSci, EnvironmentalSci, Engineering, CompSci, Math, Humanities, SocialSci, Business, Undeclared
+LECATTEND: How often did you attend lecture: Rarely, Sometimes, Mostly
+DISCATTEND: How often did you attend discussion section: Rarely, Sometimes, Mostly
+FINAL: Final exam score [0,100]
+
+First, read in the data.
+```{r}
+cd.df<- read.csv("courseData.csv")
+summary(cd.df)
+```
+
+Clean the data by omitting the NAs and set the factor levels for the survey columns.
+
+```{r}
+cd.df<-na.omit(cd.df)
+
+cd.df$CLASS_LVL<-factor(cd.df$CLASS_LVL)	
+levels(cd.df$CLASS_LVL)<- c("1yr","2yr","3yr","4yr")
+
+cd.df$GENDER<-factor(cd.df$GENDER)
+levels(cd.df$GENDER)<- c("female","male")
+
+cd.df$PREV<-factor(cd.df$PREV)
+levels(cd.df$PREV)<- c("none","some","java")
+
+cd.df$MAJOR<-factor(cd.df$MAJOR)
+levels(cd.df$MAJOR)<- c("ChemBio","Bio","OthLifeSci","Geo","Eng","CmpSci","Math","Hum","SocSci","Bus","Und")
+
+cd.df$LECATTEND<-factor(cd.df$LECATTEND)	
+levels(cd.df$LECATTEND)<- c("Rarely","Sometimes","Mostly")
+
+cd.df$DISCATTEND<-factor(cd.df$DISCATTEND)	
+levels(cd.df$DISCATTEND)<- c("Rarely","Sometimes","Mostly")
+
+summary(cd.df)
+```
+
+Generate a scatterplot matric in basic R with plot. This can take a minute or two.
+
+```{r}
+plot(cd.df)
+```
+
+May not be very readable. You can try this with subsets of the data to get a better picture, but let's try a library that will produce a more decipherable result.
+Scatterplot meatrices are a quick way to visualize relationships between variables in the data set.
+
+```{r}
+library(GGally)
+
+ggpairs(cd.df, columns=c("GENDER", "CLASS_LVL", "PREV", "FINAL"),
+    diag=list(continuous="density",   discrete="bar"), axisLabels="show")
+
+ggpairs(cd.df, columns=c("GENDER", "CLASS_LVL", "FINAL"),
+    diag=list(continuous="density",   discrete="bar"), axisLabels="show")
+
+ggpairs(cd.df, columns=c("LECATTEND", "DISCATTEND", "FINAL"),
+    diag=list(continuous="density", discrete="bar"), axisLabels="show")
+
+ggpairs(cd.df, columns=c("MAJOR", "FINAL"),
+    diag=list(continuous="density", discrete="bar"), axisLabels="show")
+```
+
+### Heat Map
+
+A heatmap is a way to visualize a table of numerical data. Instead of numbers, colored cells are displayed to represent discrete levels of values. This is a quick way to view relationships between rows and columns in the data set.
+
+The data set consists of crime statistics for each state in the USA.
+
+```{r}
+cr.df<- read.csv("crimeRatesByState.csv")
+summary(cr.df)
+```
+
+Now a few steps to get the data ready for the heatmap plot.
+
+```{r}
+# Create row names- use the first column.
+row.names(cr.df) <- cr.df$state
+
+#Next, remove the first column as it is not needed.
+cr.df <- cr.df[,-1]
+
+#Transform the data frame to a matrix for the heatmap plot.
+cr.matrix <- data.matrix(cr.df)
+```
+
+Now call the heatmap function. The "col" parameter cntrols the color palette.
+
+```{r}
+cr.heatmap <- heatmap(cr.matrix, Rowv=NA, Colv=NA, col = heat.colors(256), scale="column", margins=c(5,10))
+```
+
+This library allows for more color options.
+
+```{r}
+library(RColorBrewer)
+
+cr.heatmap <- heatmap(cr.matrix, Rowv=NA, Colv=NA, col = brewer.pal(9, "Blues"), scale="column", margins=c(5,10))
+```
+
+You can sort the data on a column to see if it makes any patterns of interest more apparent.
+
+```{r}
+cr.df <- cr.df[order(cr.df$murder),]
+
+cr.matrix <- data.matrix(cr.df)
+
+cr.heatmap <- heatmap(cr.matrix, Rowv=NA, Colv=NA, col = brewer.pal(9, "Blues"), scale="column", margins=c(5,10))
+```

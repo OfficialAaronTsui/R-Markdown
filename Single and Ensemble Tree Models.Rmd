@@ -1,0 +1,299 @@
+---
+title: "Lab- Single and Ensemble Tree Models"
+author: "Aaron Tsui"
+output: html_document
+---
+
+### Decision Tree Models: Single and Ensemble Methods. (17 questions, 43 points)
+
+This file deals with bagging, random forests, and boosting techniques. The first part demonstrates fitting and evaluating a single regression tree on a data set, as done previously. In the second part, you will use ensemble techniques on that data set.
+
+```{r, echo=FALSE, message = FALSE, results = FALSE, warning=FALSE}
+library(rpart)
+library(tree)
+library(randomForest)
+library(gbm) 
+```
+
+#### Single Tree Model: unpruned and pruned.
+
+The data set comes from a study of how certain demographics affect house prices in Boston, MA. Our goal will be to predict the median value of a house.
+
+##### Predictors:
+
+crim: per capita crime rate by town.\
+zn: proportion of residential land zoned for lots over 25,000 sq.ft.\
+indus: proportion of non-retail business acres per town.\
+chas: Charles River dummy variable (= 1 if tract bounds river; 0 otherwise).\
+nox: nitrogen oxides concentration (parts per 10 million).\
+rm: average number of rooms per dwelling.\
+age: proportion of owner-occupied units built prior to 1940.\
+dis: weighted mean of distances to five Boston employment centres.\
+rad: index of accessibility to radial highways.\
+tax: full-value property-tax rate per \$10,000.\
+ptratio: pupil-teacher ratio by town.\
+lstat: lower status of the population (percent).\
+
+##### Predicted variable:
+
+medv: median value of owner-occupied homes in \$1000s.\
+
+This code reads in the data set, also establishes a "global" seed value for any random processes in this file.
+
+```{r, echo=FALSE}
+boston.df<- read.csv("boston_house_prices.csv")
+seed.val<-12345
+```
+
+Q1 (2pts): There is one categorical predictor in this dataset. Write a statement that will convert it nto a factor instead of a numeric type.
+
+```{r}
+boston.df$chas <- as.factor(boston.df$chas) 
+```
+
+These statements create testing and training sets using half for train and half for test. Also creates the vector of true outcomes, or labels for use in model prediction later.
+
+```{r, echo=FALSE, message = FALSE, results = FALSE, warning=FALSE}
+RNGversion("3.4.3")
+set.seed(seed.val)
+data.size<-nrow(boston.df)
+train.rows<-sample(1:data.size, data.size/2)
+train.data<-boston.df[train.rows,]
+test.data<-boston.df[-train.rows,]
+true.vals<-test.data[,13]
+```
+
+Q2 (2pts): How many rows are in the test and training sets?
+
+> 253 rows in both.
+
+Q3 (2pts): Do a regression tree analysis of the data predicting median house prices, medv, using all other predictors.
+1- fit the model to the training data using the "tree" function. Assign it to the variable tree.boston.
+2- print a summary of the fitted model.
+3- plot the fit object.
+4- call the "text" method and pass in the fit object.
+
+```{r}
+tree.boston <- tree(medv ~. , train.data)
+summary(tree.boston)
+plot(tree.boston)
+text(tree.boston)
+```
+
+Q4 (4pts): Consider the two partitions that are created from the root in this model. What is the name of the predictor chosen to create the initial split? What does it measure? What values of the predictor used in the first split determine the left partition? What averge value of the predicted variable does this partition predict? What values of the predictor used in the first split determine the right partition? What averge value of the predicted variable does this partition predict?
+
+> Best predictor: rm, it measures average number of rooms per dwelling  
+Left partition: rm rule: rm<6.841     , predicted value: 19.4675
+Right partition: lstat rule: rm>=6.841    , predicted value: 36.9033
+
+#### Calculate the prediction performance on the single, unpruned tree.
+
+Q5 (2pts): Call predict on the model passing in the test data, assigning it to the variable "tree.pred". then calculate MSE by dividing the difference between the predictions, tree.pred, and true values, true.vals, by 2 and taking the mean. 
+  mean ( pred-true / 2 )
+You should get about 28.
+```{r}
+# error: it should be mean ( pred-true ^ 2 ) not mean ( pred-true / 2 )
+tree.pred<- predict(tree.boston, test.data, type="vector")
+mse <- mean((tree.pred - true.vals)^2)
+mse
+```
+
+Now look for a tree size for pruning. This code creates a plot of candidate tree sizes vs. error (deviation). 
+
+```{r, echo=FALSE}
+cv.boston<-cv.tree(tree.boston)
+plot(cv.boston$size, cv.boston$dev, type="b")
+```
+
+Q6 (2pts): Based on the plot, create a variable called "best.size" and assign to it the best size for a pruned tree according to the plot created above. The best size is the "elbow" where further sizes reduce deviance at a much slower rate it at all.
+
+```{r}
+best.size <- 2
+```
+
+Q7 (2pts): Prune the tree using the "prune.tree" function. Use the est.size variable you created above as the value for the "best" parameter. Then, in two statements, call plot and text on the object returned from the prune.tree method to procude a plot of the pruned tree.
+
+```{r}
+tree.boston.pruned <-prune.tree(tree.boston, best = best.size)
+plot(tree.boston.pruned)
+text(tree.boston.pruned)
+```
+
+Q8 (2pts): What are the predictors that are included in the pruned tree model? Which predictor(s) appeared in the unpruned tree that do not appear in the pruned tree?
+
+> Predictors in pruned tree: rm
+Predictor(s) in unpruned tree that are not in pruned tree: lstat and crim
+
+Q9 (2pts): Now make predictions and calculate MSE for the pruned tree as you did for the unpruned tree..
+
+```{r}
+tree.pred<- predict(tree.boston.pruned, test.data, type="vector")
+mse <- mean((tree.pred - true.vals)^2)
+mse
+```
+
+The following code performs 10-fold cross validation on a the unpruned and pruned trees. The data set is divided into 10 segments, or folds. In a loop, one fold is "held-out" for testing, the other 9 flds are used for training. The mse is calculated for unpruned and pruned models.
+Finally, the mean mse for both models is printed. Execute this code and answer the folowing question.
+
+```{r, echo=FALSE, message = FALSE, results = FALSE, warning=FALSE}
+RNGversion("3.4.3")
+set.seed(seed.val)
+data<-boston.df
+data.size<-nrow(data)
+data.cols<-ncol(data)
+num.folds<-10
+
+data["fold"]<-floor(runif(data.size)*num.folds)+1
+data$fold<-factor(data$fold)
+
+mse.tree<-c()
+mse.pruned<-c()
+
+for(i in c(1:num.folds)){
+    train<-data[(data$fold!=i), 1:(data.cols)]
+    test<-data[(data$fold==i),1:(data.cols)]
+    true<-test[,13]
+    #fit model
+    tree.boston<-tree(medv~., data=train)
+    tree.pruned<-prune.tree(tree.boston, best=best.size)
+    tree.pred<- predict(tree.boston, newdata=test)
+    tree.pruned.pred<- predict(tree.pruned, newdata=test)
+    # mse
+    mse.tree<-c(mse.tree, mean((tree.pred-true)^2))
+    mse.pruned<-c(mse.pruned, mean((tree.pruned.pred-true)^2))
+}
+```
+
+MSE for the unpruned tree:
+
+```{r, echo=FALSE}
+mean(mse.tree)
+```
+
+MSE for the pruned tree:
+
+```{r, echo=FALSE}
+mean(mse.pruned)
+```
+
+Q10 (4pts): How did the results of the cross-validation compare to what you would expect? Explain why or why not?
+
+> They are relatively close to my estimates from Question 5 and 9, because we selected the best size for the number of splits at the elbow of the plot of candidate tree sizes vs. error (deviation).
+
+
+
+#### Bagging (Bootstrap Aggregation).
+
+One issue with decision trees is that they tend to overfit and have lower predicitve accuracy. Why not grow a whole bunch of trees and somehow combine their outputs?
+
+Bagging- short for Bootstrap Aggregation- is one way to accomplish this. In the bootstrap part, the data is sampled a number of times to create testing sets. Each bootstrapped sample is modeled by an unpruned tree. The results of all of the trees are averaged together. For each training sample selected by bootstrapping, the remaining data is used for testing that model. The "bag" refers to the training data, and the "out of bag", or OOB, refers to the test data. The prediciton error for all trees combined is called the "out of bag error", or OOBE.
+
+The "randomForest" function does bagging when the "mtry" parameter value is equal to the number of predictors in the data set, 12 in this case.
+
+```{r, echo=FALSE, message = FALSE, results = FALSE, warning=FALSE}
+RNGversion("3.4.3")
+set.seed(seed.val)
+bag.boston<-randomForest(medv~., data=train.data, mtry=12, importance=TRUE)
+bag.pred<-predict(bag.boston, newdata=test.data)
+```
+
+MSE for the Bagged model:
+
+```{r, echo=FALSE}
+mean((bag.pred-true.vals)^2)
+```
+
+Q11 (2pts): What is the performance of this model as compared to the unpruned and pruned tree models above? 
+
+> It performs better since the mean squared error is smaller than the tree models above.
+
+
+#### Random Forest 
+
+The mtry parameter determines the number of variables the model can use at each selection point (node). In bagging, all variables can be used at every level of the growing tree.
+See the explanation for mtry in this document:
+http://code.env.duke.edu/projects/mget/export/HEAD/MGET/Trunk/PythonPackage/dist/TracOnlineDocumentation/Documentation/ArcGISReference/RandomForestModel.FitToArcGISTable.html
+
+A Random Forest is bagging except that a subset of all predictors is randomly selected from which to choose a predictor to split the data at each level when trees are built. The mtry parameter determines the size of the subset.
+
+Q12 (2pts): Adapting the code above, fit a random forest as above using mtry=6. Instead of the variables bag.boston and bag.pred, use the variables rf.boston and rf.pred. Obtain the predictions and calculate the MSE.
+
+```{r, echo=FALSE, message = FALSE, results = FALSE, warning=FALSE}
+RNGversion("3.4.3")
+set.seed(seed.val)
+rf.boston<-randomForest(medv~., data=train.data, mtry=6, importance=TRUE)
+rf.pred<-predict(rf.boston, newdata=test.data)
+mse <- mean((rf.pred-true.vals)^2)
+mse
+```
+
+MSE for the Random Forest model: 19.82482
+
+```{r, echo=FALSE}
+mean((rf.pred-true.vals)^2)
+```
+
+Q13 (2pts): What is the mse for this model and how does it compare to the bagged model?
+
+> 19.82482, which is smaller than the bagged model's mse.
+
+This code allows you to view the importance of the predictors. 
+
+```{r, echo=FALSE}
+importance(rf.boston)
+varImpPlot(rf.boston)
+```
+
+Q14 (2pts): What are the top two? How does this compares to the single tree models?
+
+> rm and lstat. This makes sense as compared to the single tree models because those are the first two variables the single trees selected for data splitting.
+
+#### Boosting
+
+Boosting is similar to Bagging and Random Forests except that trees are grown sequentially, where the next tree uses error information from the previous tree. Thus, the nect tree gets a "boost" from the previous tree.
+
+Use the gbm function to do boosting:
+
+```{r, echo=FALSE, message = FALSE, results = FALSE, warning=FALSE}
+RNGversion("3.4.3")
+set.seed(seed.val)
+boost.boston<-gbm(medv~., data=train.data, distribution="gaussian", n.trees=5000, interaction.depth=4)
+```
+
+Summary of the Boosted model:
+
+```{r, echo=FALSE}
+summary(boost.boston)
+```
+
+The code above produces a plot of the predictors and their importance in splitting the data. lists predictors by their relative influence. 
+
+Q15 (2pts): What are the top two predictors listed?
+
+> rm and lstat.
+
+Now evaluate the MSE for the boosted model.
+
+```{r, echo=FALSE}
+boost.pred<-predict(boost.boston, newdata=test.data, n.trees=5000)
+mean((boost.pred-true.vals)^2)
+```
+
+Q16 (5pts): Fill in this table which summarizes the MSE results:
+
+| Model      | MSE |
+| ----------- | ----------- |
+| 10 fold cv on unpruned tree      |  24.8672    |
+| 10 fold cv on pruned tree (size=4)   | 53.31391   |
+| Bagged model   | 23.69076  |
+| Random Forest mtry = 6  | 19.82482  |
+| Boosted model   |  17.05924 |
+
+Q17 (4pts): Briefly explain which model you would select based on these results, as well as any further changes you would make to try to increase performance of the model you selected.
+
+> I would select the Boosted model, because the mean squared error is the lowest in that model and that means that the model fits the data better. I would increase the size of the training data so that we have a better picture of the population so we can create a model more fitting of the data.
+
+
+
+
+

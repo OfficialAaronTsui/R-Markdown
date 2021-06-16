@@ -1,0 +1,188 @@
+---
+title: "Lab- R and SQL- solutions"
+author: "your name"
+output: html_document
+---
+
+```{r include=FALSE}
+#This lab makes use of the following libraries. Install them if necessary. 
+#Remember not to include the installation statements in the Rmd file.
+library(RSQLite)
+library(grid)
+library(gridExtra)
+library(ggplot2)
+```
+
+### R and SQL using the RSQLite package.  (8 questions, 33 pts. total)
+In this lab activity, you will use the R package RSQLite to gather data from a relational database
+by executing queries in SQL, the language of relational databases. Once data has been retrieved,
+you will explore the ggplot2 and other libraries to visualize the results.
+
+First, you will connect to the ACME relational database. This database is a file, ACME.db, created 
+by the SQLite program. Then you will run a few simple queries and explore the results. 
+
+A query returns a result set, which is represented by a dataframe in R, upon which you can perform any dataframe operations. 
+
+Your skills as an SQL query writer will be useful in this activity.
+
+#Part 1: Run SQL queries and Visualize the Result Set.
+
+### Connecting to the database
+To connect to the database, a software module called a "driver" is created. The driver provides a connection object which is a stream that connects to the database and can be used to execute queries and return result sets.
+
+The following statement connects to the ACME database file. The acme.db object is used to execute queries and receive result sets from that database. You will need to specify the path to the location of the ACME.db file
+on your local machine.
+```{r}
+# specify the path to the ACME.db file- omit the last / from the end of your path.
+db.path<-"C:/Users/aaron/Downloads"
+acme.db <- dbConnect(SQLite(), dbname=paste(db.path, "ACME.db", sep="/"))
+```
+
+### Check the connection.
+Once the connection has been made, you can explore the structure of the database. This statement will display a list of the tables in the ACME database. If you don't see the list of table names, the connection was not made. Make sure the file path and name are correct.
+```{r}
+dbListTables(acme.db)
+```
+
+Q1 (2pts): List the names of the tables returned from the call above in the order they appear.
+> Customer, Invoice, Line, Product, Supplier
+
+### Execute SQL queries.
+Now that you have connected to the database and viewed its tables, you are ready to write and execute some SQL queries to retrieve data. 
+
+First, you will execute a query that retrieves all of the data in from the Customer table in the ACME database. 
+
+The dbGetQuery function takes the connection object and the query string as parameters. It returns the result set as a dataframe.
+```{r}
+all.customers = dbGetQuery(acme.db, 'select * from Customer' )
+```
+
+Q2 (2pts): How many customers are in the result set?
+> 19.
+
+One way to visualize the result set of a query (which is a dataframe in this context) is to render it as a table. The grid and gridExtra packages provide a way to create fairly nice looking tables that can be customized. 
+
+Note that you will generally present tables from fairly small result sets as smaller tables are easier to read. This example uses all of the rows of the Customer table, which is small, and so it serves as a demo for what can be done. Generally speaking, you would not display a lot of data in a tabular form.
+
+### Databse vs. Presentation Names
+Notice that the column names in the Customer table in the ACME database are not always in presentable form. That's because database names, like names in programming languages, have to conform to specific rules. For example, there cannot be any whitespace characters in database table or column names. Furthermore, all names in a database will follow a naming convention. For example, names may be in all caps, or will use underscores, or will often be abbreviated, e.g.:  FIRSTNAME, first_name, FName. The naming convention should be consistent throughout the entire database.
+
+This works for the database but not necessarily for presentation purposes. Displaying raw database names is not professional, and you want to demonstrate that you took care with the way your reports and visualizations look.
+
+Q3 (2pts): List the names of the columns of the Customer table. Note that these are also the names of the columns in the all.customers dataframe.
+> CustomerID, LName, FName, Initial, Areacode, Phone
+
+The first step in displaying the table of all customers is to create a vector of suitable column names. Then a call to the grid.draw function with a nested call to the tableGrob function is made to produce the table. The table can be customized by specifying themes. Here, the default theme is used with a custom font size. The size of the table font is controlled by the base_size parameter.
+
+```{r}
+colnames<-c("Customer ID", "First Name", "Last Name", "Initial", "Areacode", "Phone")
+grid.draw(tableGrob(all.customers, cols=colnames, theme=ttheme_default(base_size = 6) ))
+```
+
+Note: The term "grob" is an abbreviation of "grid graphical object". 
+https://bookdown.org/rdpeng/RProgDA/the-grid-package.html
+There are many R packages that can render tables. This is only one possibility. 
+
+### Write a query
+Usually, we want information about specific questions we have. That means we will write queries with several constraints. 
+
+Q4 (10pts): In this question, you will construct a query that returns the ProductCode, Description, and CurrentStockValue for all products that have a CurrentStockValue greater than $200. The CurrentStockValue is a computed column which is the product of UnitPrice and the QtyInStock. The results should be ordered by CurrentStockValue in descending order.
+
+Although you can develop this query in R, it is far easier to write and perfect your query in a query editor, such as DB browser which is connected to the ACME database. Remember to start with a simple version of the query, execute it, then add another part, execute, etc. For example, do not add the constraint of >$200 until you have added the computed column to the query. Develop the query incrementally, not all at once, as it is easier to develop and troubleshoot.
+
+Once you have the finished the query, plug it in to a call to dbGetQuery and assign the result to a variable called cur.stock.vals. Then display the result set in a table in the same format as above using the grid.draw and tableGrob functions with size 6 font, etc. You do not need to make new column names as the names are presentable enough in this case. Your table should have 16 rows, and the largest CurrentStockValue should be 1798.93.
+
+```{r}
+cur.stock.vals <- dbGetQuery(acme.db, 'SELECT ProductCode, Description, UnitPrice * QtyInStock AS CurrentStockValue FROM Product WHERE CurrentStockValue > 200.0 ORDER BY CurrentStockValue DESC ')
+grid.draw(tableGrob(cur.stock.vals, theme=ttheme_default(base_size = 6) ))
+```
+
+### Visualizing data with ggplot2
+
+The following query retrieves aggregate counts of the number of customers per area code.
+```{r}
+areacode.freqs = dbGetQuery(acme.db,'SELECT areacode, count(areacode) as Customers from Customer group by areacode')
+```
+
+Q5 (4pts): Display the results in a table using the same format as the previous tables, however make this table size 10. Also, do not display row numbers. That can be done by including the "rows" parameter set to the value NULL.
+
+```{r}
+grid.draw(tableGrob(areacode.freqs, theme=ttheme_default(base_size = 10), rows = NULL ))
+
+```
+
+Q6 (2pts): What is the areacode with the most customers? How many customers have that areacode?
+> 413 with 10 Customers.
+
+This table is readable, but let's look at a bar chart of the same results.
+
+In the code below, the ggplot2 library is used to display a bar chart of area codes and the number of customers for each areacode in the database.
+
+Note the call to reorder so that the x axis is ordered by the frequencies (of customers) in ascending order. (If you added a minus sign - before the Customers parameter in the reorder call it would sort in descending order).
+
+```{r}
+ggplot(data=areacode.freqs, aes(reorder(Areacode, Customers), Customers)) + 
+  geom_col(fill="orchid")  + 
+  xlab("Areacode") +
+  ggtitle("Number of Customers per Area Code") +
+  geom_text(aes(label=Customers), size=4, vjust=-0.2)
+```
+
+You are now done with the ACME database. Always clean up by closing the connection:
+```{r}
+dbDisconnect(acme.db)
+```
+
+# Part 2: Example of a Datetime data type.
+
+Dealing with dates and time is complicated. There are various formats for dates and times in databases. Once you have queried data from a database, it may not be in the form you want for analysis or display.
+
+The datetime data type is a common way to represent dates and time. It has the format:
+yyyy-mm-dd HH:MM:SS
+For example:   2016-03-26 02:30:00
+
+There are several (many, actually) ways in R to manipulate datetime data to get the form you want. There are also many ways that you can work with this data type in SQL. We wont be covering this topic in our short time with SQL. A little example of working with datetime follows so you can see a little of what this is like.
+
+The following are two examples of how datetime data can be dealt with in R and in SQL using data from the Chinook database.
+
+```{r}
+chinook.db <- dbConnect(SQLite(), dbname=paste(db.path, "Chinook.db", sep="/"))
+```
+
+Q7 (5pts): Write and execute a query to get all columns from the invoice table for invoices for the month of January only. (invoice date  >= January 1, 2009 and invoice date < February 1, 2009). Use the date format yyyy-mm-dd as that is the format the chinook database uses. Assign the result to the variable res.jan. 
+You should have six rows in the result set.
+
+```{r}
+res.jan <- dbGetQuery(chinook.db, 'SELECT * FROM invoice WHERE invoicedate >= "2009-01-01" AND invoicedate < "2009-02-01"')
+```
+
+The following code plots the totals with the amount on the verical axis and the date on the horixzontal axis.
+
+```{r}
+areacode.chart <- ggplot(data=res.jan, aes(x=format(as.POSIXct(InvoiceDate),format='%m/%d/%Y'), y=Total, group=1))
+areacode.chart + geom_line() + geom_point()+
+   xlab("Date") + ylab("Invoice Total in $") 
+```
+
+Q8 (3pts): What are the values and dates of the highest invoice total in the month of January? The lowest?
+Describe any trend you observe in the data. 
+> $14 on 1/11, and $2 on 1/19. The data increases steadily from the start of the month until the middle of the month and then sharply decreases.
+
+
+An example of manipulating datetime in the query:
+```{r}
+res.years = dbGetQuery(chinook.db,"select CAST(InvoiceDate AS DATE) as InvoiceDate, sum(Total) as Total from invoice GROUP BY CAST(InvoiceDate AS DATE)")
+
+# Plotting the data- easier as the work was done in the query.
+areacode.chart <- ggplot(data=res.years, aes(x=InvoiceDate, y=Total, group=1))
+areacode.chart + geom_line() + geom_point()+
+   xlab("Year") + ylab("Invoice Total $") 
+```
+
+Q9 (3pts): What are the years with the highest and lowest invoice totals? Briefly describe the behavior of the data over the time interval. Is there a trend in this data?
+> Highest is 2010, and Lowest is 2009. There is no trend in the data, but the data seems to adjust like the housing market does, since the sharp increase of invoice total from 2009 to 2010 seems related to the market recovering after the 2008 recession.
+
+Always clean-up!
+```{r}
+dbDisconnect(chinook.db)
+```

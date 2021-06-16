@@ -1,0 +1,180 @@
+---
+title: "Lab- Time Series"
+author: "Aaron Tsui"
+output: html_document
+---
+
+### Time series (17 questions, 67 points)
+
+The data are monthly high temperature observations (in degrees C) for Melbourne, Australia from July 2008 to June 2017. 
+
+#### Topics in this Lab:
+
+1. Read data from a file with the scan function and get a vector.
+2. Deal with missing values by imputation.
+3. Convert the vector to a time series object.
+3. Explore modeling techniques for time series.
+4. Evaluate model fit and model predictions.
+
+The following libraries need to be loaded for this activity. Install these libraries if necessary and then execute the statements below to load the installed libraries into the R session. Remember the install statements should not be included in this Rmd file.
+
+```{r, echo=FALSE, message = FALSE, results = FALSE, warning=FALSE}
+library(zoo)
+library(forecast)
+```
+
+Q1 (2pts): Read in the data from the file "MelbourneTemps.csv". Assign it to a variable called temps.df. Next, get the HiTemp column and assign it to a vector named temps.vec. Finally, call the summary function on the vector.
+Note: you can open this file with a spreadsheet app or a plain text editor if you want to look at the contents.
+
+```{r}
+temps.df <- read.csv("MelbourneTemps.csv", sep=",", header=TRUE)
+temps.vec <- temps.df$HiTemp
+summary(temps.vec)
+```
+
+Notice there are some missing values in this vector. You have to check for missing values as this a time series which means that data has to be observed at the regular interval, in this case, yearly.
+
+#### Impute missing values
+We cannot just remove the NAs as that would mean the data is no longer in the proper chronological order. The best way to solve this problem is to "impute" what the missing data would likely be and replace the NA with the imputed value. There are many algorithms for calculating imputed values. You can find out more about how the imputed values are calculated by the na.approx function in the Details part of the documentation page: ?na.approx.
+
+Q2 (2pts): Call the na.approx method to impute temperature values for the missing observations and assign the result to the temps.vec variable. Call summary to view the vector's stats to verify there are no missing values.
+
+```{r}
+temps.vec <- na.approx(temps.vec)
+summary(temps.vec)
+```
+
+#### Create a ts object, training and testing sets
+
+Q3 (5pts): Write a statement to create a time series object called temp.ts based on the temps.vec vector. The frequency of observations is monthly, so the frequency is 12 times per year. Look at the data to determine the correct starting and ending years and months. The Date column in the file is of the form mm/dd/yyyy. The start parameter can be assigned to a vector of the form start=(year, month). Execute that statement, then type temp.ts in the R console (not in the Rmd file) to check that it matches the data in the csv file.
+
+```{r}
+temp.ts <- ts(temps.vec, frequency = 12, start=c(2008, 7))
+```
+
+Q4 (5pts): After you have checked that the time series object is correct, visualize the series by calling the plot function on the temp.ts object. Then use the plot and decompose functions to generate the plot showing the components of this time series.
+
+```{r}
+plot(temp.ts)
+temp.ts.comp <- decompose(temp.ts)
+plot(temp.ts.comp)
+```
+
+Q5 (5pts): After viewing the plots above, is this a stationary or non-stationary time series? Briefly state why.
+
+> It somewhat in-between stationary, since the trend doesn't show any major patterns and it stays the same for some parts of the graph but not for others.
+
+Q6 (2pts): Plot a histogram of the noise component of the series. You can get that component from the return of the decompose function- see ?decompose, random in the "Value" section of the documentation page.
+
+```{r}
+plot(temp.ts.comp$random)
+
+```
+
+Q7 (2pts): Is the noise component roughly normally distributed? Is the mean located approximately at 0?
+
+> Yeah, the mean looks located approximately at zero and is somewhat roughly normally distributed.
+
+Q8 (5pts): Now make training and testing data sets. In time series, the testing set has to be taken from the most recent end of the series to preserve the temporal ordering of the series. You will use 80% of the data for model training and 20% for testing.
+
+In one statement, create a time series object called train.data that contains the observations from the start of the series, July 2008, to September 2015. There are several ways to do this. One suggestion is to use the window function in the stats package, and pass in the temp.ts object and a start and end parameter. You can use the same format for the start and end parameters as in the call to the ts function, e.g: start=(year, month).
+
+In a second statement, create a time series object called test.data that contains the observations from October 2015, to the end of the series, June 2017.
+
+```{r}
+train.data <- window(temp.ts, start=c(2008, 7), end=c(2015, 9))
+test.data <- window(temp.ts, start=c(2015, 10), end=c(2017, 6))
+```
+
+After executing your statements, type train.data and test.data in the R console (not in the Rmd file) to check that the results match the dates given above.
+
+#### Modeling time series data
+
+Modeling time series data is often referred to as the process of "smoothing". In visual terms, this means that we want to find a line that captures a general trend in the series without fitting the random noise component. Otherwise, modeling time series has the same general considerations as any other modeling. We want the model to explain the trend in the data but not fit the the noise in one specific set of data.
+
+An simple example of smoothing is the simple moving average (SMA) method. In this lab you will fit more complex models that can have adjustable parameters for more flexibility. These models consider the amount of "weight" to give to past observations versus newer observations in the series.
+
+First, you will fit a Holt-Winters exponential model and then an ARIMA (autoregressive) model and compare them for fit on the training set and prediction on the test set.
+
+##### Exponential smoothing. 
+
+Q9 (5pts): Use the hw (?hw) method to fit a Holt-Winters triple exponential model to the training data. Pass in the train.data object, and the parameter h set to 21 (for 21 months). Assign the object returned to the variable model.hw. Call the plot function to show the data and the model's forecast.
+
+```{r}
+model.hw <- hw(train.data, h = 21)
+plot(model.hw)
+```
+
+
+Q10 (2pts): In the R console, print out the model information. Look at the help page ?hw "Value" section for the name to use to get the model info. What are the values the three smoothing parameters: alpha, beta, and gamma?
+
+> 0, 0, and 0.
+
+Q11 (2pts): Look at the residuals from the fit for model.hw. You can get multiple informative plots by calling the checkresiduals funtion, passing the model in to the call. Write and execute that statement.
+
+```{r}
+checkresiduals(model.hw)
+```
+
+Q12 (5pts): Based on the plots generated on the fit resdiuals: in the histogram, are the residuals normally distributed with location around 0? Is there any significant autocorrelation in the residuals according to the correlogram? What does the Ljung-Box test say about the autocorrelation in the residuals?
+
+> Yes, in the histogram, the residuals are normally distributed around 0. No, there is no significant autocorrelation in the residuals according to the correlogram. The Ljung box test says the autocorrelation is independently distributed.
+
+You will compare the fit accuracy (the in-sample errors) as well as the prediction accuracy (the out of sample errors) of the model.hw with the arima model in the next section.
+
+##### Auto-regressive models- ARIMA.
+
+Next, you will fit an ARIMA model to the training data and make forecasts. You will use a function that will find the best arima model by automation. 
+
+Q13 (5pts): Call the auto.arima function and pass in the training data object. Assign the return to the variable arima.fit. This may take a minute to run.
+Now call the checkresiduals function on the arima.fit object.
+
+```{r}
+arima.fit <- auto.arima(train.data)
+checkresiduals(arima.fit)
+```
+
+Q14 (5pts): Based on the plots generated on the fit resdiuals: in the histogram, are the residuals normally distributed with location around 0? Is there any significant autocorrelation in the residuals according to the correlogram? What does the Ljung-Box test say about the autocorrelation in the residuals?
+
+> Yes, in the histogram, the residuals are normally distributed around 0. No, there is no significant autocorrelation in the residuals according to the correlogram. The Ljung box test says the autocorrelation is not independently distributed; it exhibits serial correlation.
+
+Q15 (5pts): Call the forecast function, passing in the arima.fit object and h=21. Assign the result of this call to arima.pred.
+In another statement, plot arima.pred.
+```{r}
+arima.pred <- forecast(arima.fit, h=21)
+plot(arima.pred)
+```
+
+#### Forecast accuracy
+
+Q16 (5pts): Compare the accuracy of the Holt-Winters and ARIMA models.
+Write two statements that each call the accuracy function; the first statement calls accuracy and passes in the model.hw and the test.data, and the second calls accuracy and passes in the arima.pred and the test.data.
+
+```{r}
+acc1 <- accuracy(model.hw, test.data)
+acc2 <- accuracy(arima.pred, test.data)
+```
+
+Compare the accuracy of the two models on the test data. A forecast “error” is the difference between an observed value and its forecast. Note that forecast errors are different from residuals in two ways: 1- residuals are calculated on the training data; forecast errors are calculated on the test set, and 2- residuals are based on one-step forecasts while forecast errors can involve multi-step forecasts.
+
+These are some brief descriptions of some of the accuracy measures:
+
+The forecast errors are on the same scale as the data. 
+Mean absolute error: MAE
+Root mean squared error: RMSE
+
+Percentage errors:
+Mean absolute percentage error: MAPE, estimate/actual * 100
+
+The mean absolute scaled error, MASE, scales the errors based on the training MAE from a simple forecast method.
+
+Q17 (5pts): Fill in this table:
+
+| Model      | MAE | MAPE | MASE |
+| ----------- | ----------- | ----------- | ----------- |
+| HW      | 4.868225    | 24.69339    |  1.2021627   |
+| ARIMA   | 3.487550     | 16.07178    |  0.8612179   |
+
+Is there a model that is has consistently fewer forecast errors? Which model? 
+
+> Yes. The arima.pred model has consistently fewer forecast errors.

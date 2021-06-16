@@ -1,0 +1,264 @@
+---
+title: "Activity- Time Series"
+author: "Aaron Tsui"
+output: html_document
+---
+
+### Time series (13 questions, 65 points)
+
+Time series analysis deals with data in different form that we have previously seen. Imagine that we are sampling from a stream of data over a period of time. The stream consists of a sequential set of observations. In data structure terms this means a vector of values. There is some "meta data" associated with the sequence of observations: the start and end of the observations as well as the frequency of sampling. 
+
+#### The Data
+To begin, you will work with time series data on birth rates in New York city observed monthly over a period of 13 years. This series starts in January 1946 and ends in December 1959. An interesting time in the US as the post world war 2 "baby boom" was beginning. 
+
+Consider the nybirths.csv data file. Open the file with a plain text editor or a spreadsheet app. The contents of this file are in the form of a single vector of numbers, not in the form of a table. There is no meta data, such as a column name.
+
+The values you see are the "crude birth rate" per month. The crude birth rate is generally computed as a ratio, where the numerator is the number of live births observed in a population during a reference period and the denominator is the number of person-years lived by the population during the same period. It is expressed as births per 1,000 population. 
+
+This series starts in January 1946 and ends in December 1959. The the crude birth rate was recorded each month, so the frequency of observations is 12 within each year. 
+
+The following libraries need to be loaded for this activity. Install these libraries if necessary and then execute the statements below to load the installed libraries into the R session. Remember the install should not be included in this Rmd file.
+
+```{r, echo=FALSE, message = FALSE, results = FALSE, warning=FALSE}
+library(ggplot2)
+library(zoo)
+library(TTR)
+```
+
+#### Steps in this Activity:
+
+1. Read data from a file with the scan function and get a vector.
+2. Convert the vector to a time series object.
+3. Explore the characteristics and components of two time series data sets.
+4. Use ggplot as an alternate way to visualize the time series.
+5. Explore a stationary time series and additive vs multiplicative time series.
+6. Apply simple smoothing techniques to a time series.
+
+#### Reading in and visualizing data
+
+We have primarily worked with data in tabular form in a csv file, using the read.table or read.csv functions to produce a data frame. Time series data is in a linear form; a single vector of observations. You will use the "scan" function to read in this type of file. The scan function will return a vector instead of a data frame (execute ?scan and look at the Value part of the doc). This vector will then be encapsulated in a time series object which can be used for analysis. 
+
+Q1 (5pts): Write a statement that calls the scan function, passing in the "nybirths.csv" file name and assign the return to the variable birth.vec. Then write a statement to display the first 10 values in this vector.
+
+```{r}
+birth.vec <- scan("nybirths.csv")
+birth.vec[(1:10)]
+```
+
+#### The ts function.
+Q2 (5pts): The ts function will take a vector of data and some parameters about the time series such as the starting and ending dates/times and the frequency of observations. Remember that a time series relies on data observed at a regular frequency. 
+
+The vector birth.vec contains the birth rate data. The data was recorded for every month of the year, so the frequency of observations is 12. The data starts in January in the year 1946 and ends in December in the year 1959.
+
+Write a statement that calls the ts function, passing in the data vector, the frequency parameter set to 12, and the start parameter, a vector with the start year 1946 and starting month 1. You do not need an end parameter as we want all of the data, and the ts function will know how to apply the correct year and months to the observation data. Execute ?ts in the r console (not in the Rmd file) to see the documentation page.
+
+Assign the call to the ts function to the variable birth.ts1. Since this output is relatively small and because this is an academic setting, print the contents of birth.ts1 to the console. You can verify the data lines up with the starting and ending months and years by viewing this output.
+
+```{r}
+birth.ts1 <- ts(birth.vec, frequency = 12, start=c(1946,1))
+birth.ts1
+```
+
+Q3 (5pts): Call the plot function passing in the time series object birth.ts1 to visualize the time series.
+
+```{r}
+plot(birth.ts1)
+
+```
+
+#### Visualize with ggplot2
+Another way to visualize a time series is to use the ggplot2 library. This requires some code to transform the data from a ts object into a dataframe object for the ggplot function. Note that we have to convert the data vector, the birth rate, in the birth.ts1 object into a matrix, and convert the date information in the birth.ts1 object into a column named "date" in the dataframe. Notice the date format is i the form "yyyy-mm-dd".
+
+The call to ggplot is assigned to a variable birth.plot1 because we will add to it later on in this activity.
+
+```{r, echo=FALSE, warning=FALSE}
+birth.df1<-data.frame(birth=as.matrix(birth.ts1), date=as.Date(as.yearmon(time(birth.ts1))))
+
+birth.plot1 <- ggplot(data = birth.df1, aes(x = date, y = birth)) + 
+  geom_line(color = "#00AFBB", size = 1)
+birth.plot1
+```
+
+Q4 (5pts): You will now practice working with the ts function to create another time series object that is a subset of the original data by writing the following statements;
+1- Create a vector that contains data that starts on January, 1948 and ends July, 1956. This means you will not include the first two years and the last 41 months in the new vector. Remember that the first 12 values represent the first year, so you can do the arithmetic to  (the length of the new vector should be 103). A simple way to do this is to use bracket notation to select the part of the original data vector, birth.vec, and assign it to a new variable called birth.vec2. The bracket contains the sequence of indexes you want to select:
+
+                           new.vec <- old.vec[start:end]
+                          
+So if start was 3 and end was 10, new.vec would contain the values in old.vec from index 3 to index 10.
+
+2- Use this new vector, birth.vec2, to create a timeseries object called birth.ts2. Use the correct start parameter and add an "end" parameter that ends July, 1956. 
+
+3- Print the birth.ts2 variable to the console to check that it is correct.  
+
+```{r}
+birth.vec2 <- birth.vec[1:103]
+birth.ts2 <- ts(birth.vec2)
+birth.ts2
+```
+
+Q5 (5pts): Call the plot.ts function passing in the time series object birth.ts2 to visualize the time series.
+
+```{r}
+plot.ts(birth.ts2)
+
+```
+
+This code creates and displays a ggplot with the same subset of the time series as above but does it in a different way. It defines start and end dates and applies them to the birth.df1 data. This is an alternate way to select part of the time series by setting min and max limits on the dates to be plotted in ggplot: 
+
+```{r, echo=FALSE, warning=FALSE}
+min <- as.Date("1948-1-1")
+max <- as.Date("1956-7-1")
+
+birth.plot2 <- ggplot(data = birth.df1, aes(x = date, y = birth)) + 
+  geom_line(color = "#00AFBB", size = 1) +
+  scale_x_date(limits = c(min, max))
+```
+
+Q6 (5pts): Consider the plots of birth.ts1. Is there a trend? Is the trend the same over the entire time series? Consider the plots of birth.ts2. Is there a trend? Is the trend the same over the entire time series?
+Write your answer after the arrow below.
+
+> Both birth.ts1 and birth.ts2 start overall decreasing at the start of the graph, only to sharply increase shortly after. The plot of birth.ts1 typically has 2 year Periods in terms of how the data fluctuates between high and low values, while birth.ts2 has 1 year periods between peaks/crests in the data.
+
+
+#### Time series components
+
+In general, a time series has three major components:
+TS = trend + cycle(season) + noise
+
+Note that not all TS have a trend or a seasonal/repeating cycle (see staionary time series).
+
+#### The decompose function.
+The trend, cycle, and noise (random) components can be decomposed and displayed all at once by calling the decompose function with the birth.ts object as a parameter and assigning its return to birth.ts.comp. Then this object is passed to the plot function.
+
+```{r, echo=FALSE, warning=FALSE}
+birth.ts.comp <- decompose(birth.ts1)
+plot(birth.ts.comp)
+```
+
+Q7 (5pts): Do the component graphs for trend and seasonal agree with your observations about birth.ts1? The random plot shows noise. What do you observe about that plot?
+Write your answer after the arrow below.
+
+> Yes. There are very few times where the random goes as extreme as absolute value of 1.5, only once in the positive direction and once in the negative direction.
+
+To see the series in a "seasonally adjusted" manner, subtract the seasonal component.
+
+```{r, echo=FALSE, warning=FALSE}
+birth.ts.season.adj <- birth.ts1 - birth.ts.comp$seasonal
+plot(birth.ts.season.adj)
+```
+
+Q8 (5pts): What components does the plot show? Write your answer after the arrow below.
+
+> The plot shows random, trend, and observed.
+
+
+#### Change from non-stationary to stationary
+
+Differencing a non-stationary time series will "smooth" out the mean of the series, making it a stationary time series. This is sometimes used in forecasting.
+
+```{r, echo=FALSE, warning=FALSE}
+birth.ts.diff <- diff(birth.ts1, differences=1)
+plot.ts(birth.ts.diff)
+```
+
+Q9 (5pts): What is the main characteristic of a stationary time series? A non-stationary time series? Write your answer after the arrow below.
+
+> A stationary time series shows the fluctuations and errors from zero that the data has without showing the correlation between the two variables. You can measure how different each data point is. A non-stationary time series you get a better outward look at the data, since it shows the correlation between the two variables.
+
+
+#### Additive and Multiplicative time series.
+
+The births series is an example of an additive model. The cyclical component's amplitude remains constant over the trend. 
+AddTS = trend + cycle + noise
+
+These statements read in the "souvenir.csv" file, convert it to a ts object using frequency 12 and start 1987,1 and plots that time series.
+
+```{r, echo=FALSE, warning=FALSE}
+sv.vec <- scan("souvenirts.csv")
+sv.ts <- ts(sv.vec, frequency=12, start=c(1987,1))
+plot(sv.ts)
+```
+
+Q10 (5pts): Is this time series additive or multiplicative? Why?
+Write your answer after the arrow below.
+
+> Multiplicative because visually the amplitude looks like it ramps up very fast.
+
+
+Remember that a log transformation of a product is equal to the sum of the log of the factors. So, the log of a multiplicative model is an additive model. This means you can always convert a multiplicative model to n additive model.
+
+A plot of the log of the time series from above. 
+
+```{r, echo=FALSE, warning=FALSE}
+plot(log(sv.ts))
+```
+
+Q11 (5pts): Is this the plot of an additive or multiplicative time series? Why?
+Write your answer after the arrow below.
+
+> Additive, because the amplitude stays the same throughout the whole graph.
+
+#### Smoothing
+Smoothing, like modeling, is really the process of generalizing a trend from a set of observations. Fitting a linear regression model to a set of data produces a model that should generalize a trend without fitting the variance due to noise. 
+
+In time series, modeling can be seen as the process of smoothing. We apply various smoothing techniques to model the time series so we can understand the behavior of the series and to be able to predict, or forecast what the series would be like in the future.
+
+To better see the trend in the births series, one can use a smoothing method such as SMA: simple moving average. This technique computes the average of values in a series over a specified number of values; the "window" size. Then, the window shifts down one value and another average is computed. Thus, the time series is represented as a series of averages. The larger the window size, the more the series is smoothed. As with modeling, like linear regression, the more general the model the more it "ignores" variations in the data (higher bias). The more complex the model, the more it fits the variance in the data at a loss of generality. This is the trade-off between generality and variance inherent in modeling.
+
+The SMA function will perform the simple moving average calculation and return the resulting time series. The parameter "n" controls the range of the average, or "window", and therefore the "smoothness" of the graph.
+
+The code below uses the births time series to illustrate the effect of using a different "window" size for the moving average, and thus the "amount" of smoothing. Think about how this relates to a linear regression line and the data points that it fits. Both are making generalizations by "ignoring" some of the variation in the data.
+
+The SMA function in the TTR library is used. There will be six individual plots.
+
+```{r, echo=FALSE, warning=FALSE}
+plot.ts(birth.ts1, ylab="", xlab="")
+
+birth.ts3 <- SMA(birth.ts1,n=3)
+plot.ts(birth.ts3, ylab="", xlab="")
+
+birth.ts8 <- SMA(birth.ts1,n=8)
+plot.ts(birth.ts8, ylab="", xlab="")
+
+birth.ts10 <- SMA(birth.ts1,n=10)
+plot.ts(birth.ts10, ylab="", xlab="")
+
+birth.ts20 <- SMA(birth.ts1,n=20)
+plot.ts(birth.ts20, ylab="", xlab="")
+
+birth.ts30 <- SMA(birth.ts1,n=30)
+plot.ts(birth.ts30, ylab="", xlab="")
+```
+
+Q12 (5pts): Compare the plots above. Which SMA call produces the most smoothing? Does the smoothing make the trend more or less visible? How does the level of smoothing affect the seasonal cycle?
+Write your answer after the arrow below.
+
+> birth.ts30 produces the most smoothing. The smoothing makes the trend more visible, but the seasonal cycle is lessened greatly by the smoothing.
+
+#### Lowess smoothing
+Another comon smoothing technique is Lowess (or Loess) regression. Lowess stands for Locally Weighted Scatterplot Smoothing. This is a very interesting algorithm that makes use of linear regression in a "local" manner. The details are outside of the scope of this class, but check out these refrences on Loess to learn more:
+
+https://www.statisticshowto.com/lowess-smoothing/
+
+https://towardsdatascience.com/loess-373d43b03564
+
+This code adds a loewess regression trend line to the birth.plot1.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+birth.plot1 + stat_smooth(
+  color = "#FC4E07", fill = "#FC4E07",
+  method = "loess"
+)
+```
+
+Q13 (5pts): Now write the statement that will add a loewess regression line to the birth.plot2 and display the plot.
+
+```{r, warning=FALSE, message=FALSE}
+birth.plot2 + stat_smooth(
+  color = "#FC4E07", fill = "#FC4E07",
+  method = "loess"
+)
+
+```
+
+Notice the message that some of the data was "removed". That's because we set limits on the data to be plotted that are less than the entire series. You will encounter more time series modeling techniques in the lab for times series analysis.

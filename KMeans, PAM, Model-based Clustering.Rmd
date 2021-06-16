@@ -1,0 +1,435 @@
+---
+title: "Activity-Clustering"
+author: "Aaron Tsui"
+date: "Mar 19 2021"
+output: html_document
+---
+
+### The Clustering Task. (21 questions, 57 points)
+
+The goal of clustering is to use an algorithm to discover groupings, or clusters of data with similar characteristics.
+K-means is one algorithm that does this, provided we supply a distance metric and the number of clusters, k. There are many other clustering algorithms.
+
+In this activity, we'll work with three different clustering techniques:
+
+1. K-means. 
+2. Partitioning About Medioids (PAM). 
+3. Model-based clustering, where data points are clustered by probability distributions (the probability they belong to a cluster). The number of clusters does not need to be stated.
+
+These are the libraries you will need for this activity. Remember they need to be installed before these statements can be executed, and not to include any install statements in your Rmd files.
+Note: This file may take several minutes to knit as some of the functions are doing a lot of computational work.
+
+```{r, include=FALSE}
+library(NbClust)
+library(flexclust)
+library(cluster)
+library(fpc)
+library(mclust)
+```
+
+#### Part 1. Clustering with K-means
+
+K-means is a clustering technique that is widely used. It is an example of an unsupervised learning technique. It is unsupervised because there are no pre-defined labels to serve as examples of true ouctomes.
+
+In contrast, KNN was an example of a supervised learning technique. It is termed supervised because we provided training examples for the algorithm: <data, label>. 
+
+While K-means can uncover clusters in data, it is up to the analyst to provide the meaning of those clusters.
+
+The k-means algorithm is simple: given a data set and a number of clusters, k:
+1- choose k cluster centers at random.
+2- assign each data point to the cluster center it is closest to.
+3- move the cluster center to the average point (centroid) for all of its member data points.
+4- repeat steps 2 and 3 until there are no cluster reassignments or until some stopping criterion is met.
+
+#### Some notable aspects of k-means.
+
+The number of clusters has to be stated up front. Of course it makes sense to try various numbers of clusters. The results of k-means is sensitive to the initial placement of the centers (done at random). It is usual to run the algorithm many times with the same k and take the best result. The distance metric could also be changed. 
+
+The algorithm is unsupervised because we do not give it examples of students who belong to a certain cluster- it learns cluster membership by itself.
+
+Question: Could you overfit the data with k-means? What if k=N, where N is the number of data points?
+
+#### Example with K-means.
+Before you begin, execute this statement to set a seed value for the random number generator.
+```{r, include=FALSE}
+seed.val<-1234
+```
+
+In this part, you will cluster data from the wine industry with k-means. First, you will read in the data, explore and condition it as necessary.
+
+Q1(2pts): Write a statement that reads in the wine_cultivar_data.csv file and assign it to a variable "wine.data". Then answer the question below after the arrow.
+
+```{r}
+wine.data <- read.csv("wine_cultivar_data.csv", sep=",", header=TRUE)
+```
+
+How many rows are in this dataset?
+
+> 180
+
+Each row (data point) is a wine that is represented by 13 chemical measurements plus the column "Cultivar", which designates the type of plant used to produce the wine. It is a categorical variable that we can treat as a label- and omit from the data we use for our clustering algorithm.
+
+Although we are not using labels for training as this is unsupervised learning, it's worth a look at the "Cultivar" column. This is the type of vine plant used to produce the wine. This column may provide some insight about the clusters learned by our algorithms. In classification, the labels would be part of the learning, or training process. In unsupervised learning they are not.
+
+Q2(2pts): Write statement(s) to make this column a factor. Do not assign any labels or levels. This means the actual values will be used as the levels. Display this output by calling the summary function on the Cultivar vector.
+
+```{r}
+summary(as.factor(wine.data$Cultivar))
+
+```
+
+Q3(2pts): How many unique cultivars are represented in the data? Which cultivar is most frequent?
+> There are 3 unique Cultivars, and the second cultivar is the most frequent.
+
+In the following analysis, you will cluster the data on the 13 chemical observations (column index 2:14) and then look at how the clusters relate to the Cultivar. This analysis can help understand the relationship between cultivars and the chemistry of the wines they produce. If they are strongly related, you would see that the data forms roughly the same number of clusters as there are unique cultivars in the data set. One would expect a fairly strong correlation between cultivar and wine chemistry as the grapes are the raw material for producing the wine. If there is a weak correlation, such that one or more cultivar is represented in more than one cluster, it suggests that maybe vinters could plant cultivars that are easier to grow and that the wine would be of similar quality as compared to other cultivars that are more difficult to grow.
+
+After reading in the data and examining the columns, the next step in the analysis is to remove any missing observations. 
+
+Q4(2pts): Write a statement that removes any rows that contain an NA value from the dataset. One way to do this is with the "complete.cases" function. The result of your statement(s) is that there are no NA values in the dataframe wine.data.
+
+```{r}
+wine.data <- wine.data[complete.cases(wine.data),]
+```
+
+Q5(3pts): How many rows were in the dataset originally? How many rows are now in the data set? How many rows were removed, if any?
+> 180 and 178. 2 rows were removed.
+
+The next step is to prepare the data for clustering. The columns 2:14 are all numerical values, so a distance metric such as euclidean could be used; however, the range and scale of these values are very different.
+
+Q6(4pts): Part 1: What is the name of the column that has the largest number as its maximum value? the smallest?
+> name of largest max column: Proline       , name of smallest max column: NonflavanoidPhenols
+
+Part 2: Scale the data by calling the "scale" function. Pass in the wine.data dataframe but without the first column, "Cultivar". Assign the call to scale to the variable "wine.data.scaled".
+
+```{r}
+wine.data.scaled <- scale(wine.data[-1])
+```
+
+You will use the dataframe "wine.data.scaled" for input to the k-means, PAM and Model-based clustering algorithms that follow. 
+
+##### Cluster the data with kmeans
+
+The k-means algorithm is carried out by the function "kmeans". The three parameters we will use are: the data to be clustered, the number of clusters, and the number of "runs" of the algorithm, called "nstart". 
+
+kmeans(dataset, k, nstart)
+
+The nstart parameter is due to the fact that the initial starting positions of the cluster centers is random and can have an effect the outcome. The value of nstart will cause kmeans to run that many different (random) starts and report the best run.
+
+Q7(2pts): Call kmeans on the scaled wine data frame. Use 8 clusters, and nstart=25. Assign it to "fit.km8".
+
+```{r}
+RNGversion("3.6.2")
+set.seed(seed.val)
+fit.km8 <- kmeans(wine.data.scaled, centers = 8, nstart = 25)
+```
+
+Q8(3pts): What is the default value of the parameter "nstart"? Why would that not be the best value?
+
+> default value:  1, That may not be the best value because with only 1 run with 1 random number, we will get a result that is not as representative of the data.
+
+
+One way to gauge the quality of the clustering is to calculate the "cohesiveness" of the clusters. This can be measured by calculating the sum of the squares of the differences in distances from data points in a cluster to their cluster center.
+
+Check out some of the values (attributes) in the fit.km8 object by executing the three statements below. 
+Execute ?kmeans in the R console (not in the Rmd file) and look at the "Value" part of the doc page for details on the attributes that you can access in the object returned from the call to kmeans. "Value" in the doc means what the function returns.
+
+These three statements print:
+1- size: the size of the eight clusters. How many data points in each cluster.
+2- tot.withinss: the total sum of squared distances within clusters. A measure of "cohesiveness".
+3- betweenss: the between cluster sum of squared distances. How well separated are the clusters.
+(Use the dollar sign to reference these attributes in the fitted object returned from the call to kmeans).
+
+```{r}
+fit.km8$size
+fit.km8$tot.withinss
+fit.km8$betweenss
+```
+
+Q9(3pts): Based on the output of the statements above, answer the following: 1- What is the size (number of data points) of the largest cluster? 2- The smallest? 3- Is the ss (sum of squared distances) inside clusters less than the ss between clusters? 4- Based on your answer to 3, is this a good result?
+
+>There are 53 data points in the largest cluster, and 5 points in the smallest. Yes, the ss inside clusters is less than the ss between clusters. Yes, this is a good result because that means the clusters are actually clusters of data points that are close together.
+
+
+##### Determine the optimal number of clusters.
+
+In the above call to kmeans, the number 8 was arbitrarily chosen. How many clusters should we specify on this data? This depends on what you are interested in knowing, what hypotheses you or domain experts may have. Does the data support the hypothesis that there are 8 clusters? 
+
+Perhaps there is a different k that the data would "naturally" group into. How can we find this k?
+There are many techniques for determining the optimal number of clusters in data. You will look at one measure: within-groups sums of squares, WSS, which measures how tightly the data points in a cluster are to each other- or to the cluster center ("cohesiveness"). From the WSS calculation, a graph is displayed showing the WSS error against the number of clusters, k. This is often called the "elbow" graph. The reason for that name will be apparent below. 
+
+A plot of the total within-groups sums of squares against the number of clusters for a range of cluster numbers can be helpful. A bend, or "elbow" in the graph suggests the appropriate number of clusters. Any less, and the WSS error rapidly increases. Any less, and the WSS does not increase by much. The reason for that could be that more clusters may decrease the error slightly, but you may be loosing generality and run the risk overfitting. 
+
+Remember that the goal in clustering is to maximize the distance between clusters and minimize the distance between data points inside their cluster (cohesiveness).
+
+The "elbow" graph can be produced by the following function. Note that the function uses a loop to run knn many times.
+
+```{r}
+wssplot <- function(data, nc=15, seed=1234){
+               wss <- (nrow(data)-1)*sum(apply(data,2,var))
+               for (i in 2:nc){
+                    set.seed(seed)
+                    wss[i] <- sum(kmeans(data, centers=i)$withinss)}
+                plot(1:nc, wss, type="b", xlab="Number of Clusters",
+                     ylab="Within groups sum of squares")
+           }
+```
+                     
+Q10(2pts): Now call the wssplot function using the scaled wine data as the parameter.
+
+```{r}
+wssplot(wine.data.scaled)
+  
+```
+
+Q11(4pts): The "elbow" in the plot seems to be 3 clusters. Investigate this k value in more detail. 
+Write four statements below the calls to set the version of the RNG and to set.seed:
+1- Run kmeans on the scaled data with k=3, nstart=25. Assign that call to fit.km3.
+2- Print the size of the eight clusters showing how many data points in each cluster.
+3- Print the total sum of squared distances within clusters- a measure of cluster "cohesiveness".
+4- Print the between cluster sum of squared distances- shows how well separated are the clusters.
+These correspond the these attributes: size, tot.withinss, and betweenss. Use the dollar sign to reference these attributes in the fitted object returned from the call to kmeans.
+
+```{r}
+RNGversion("3.6.2")
+set.seed(seed.val)
+fit.km3 <- kmeans(wine.data.scaled, centers=3, nstart=25)
+fit.km3$size
+fit.km3$tot.withinss
+fit.km3$betweenss
+```
+
+Q12(4pts): Repeat the statements above with 4 and 5 clusters. Call set.seed before each clustering- that means you do it twice, once before each call to kmeans.
+
+```{r}
+RNGversion("3.6.2")
+set.seed(seed.val)
+# using k=4
+fit.km4 <- kmeans(wine.data.scaled, centers=4, nstart=25)
+fit.km4$size
+fit.km4$tot.withinss
+fit.km4$betweenss
+
+
+
+
+RNGversion("3.6.2")
+set.seed(seed.val)
+# using k=5
+fit.km5 <- kmeans(wine.data.scaled, centers=5, nstart=25)
+fit.km5$size
+fit.km5$tot.withinss
+fit.km5$betweenss
+
+
+
+
+```
+
+Q13(3pts): How are the values for withinss changing (increasing or decreasing) as the number of clusters increases from 3 to 5? Do you expect this result? Briefly explain why or why not.  
+
+> Decreasing. I do expect this result because with the more clusters, the less data points in each cluster, making the distance between data points smaller.
+
+
+Here is a visualization of the clusters for k=3 and for k=5:
+```{r}
+par(mfrow=c(1,2))
+plotcluster(wine.data.scaled, fit.km3$cluster)
+plotcluster(wine.data.scaled, fit.km5$cluster)
+```
+
+It is important to note that these two plots are not showing the actual data but a 2D representation of a 13 dimensional space. The axes represent "principle components" (PC) of variance in the data. More on that at the end of this activity.
+These plots really just give a visual idea of cluster membership and roughly how "close" they are.
+
+#### Automated Cluster Evaluation
+
+There are many other ways to measure the "goodness" of clustering (referred to as "indices") besides WSS that can be used for judging the best number of clusters in a data set. The NbClust library will use up to 30 indices on the data using a specific clustering method to find the optimal number of clusters. Not all of the indices will agree, so the best answer is by majority vote. 
+
+Note that this call may take several minutes, maybe 10 minutes, to complete as it's performing many tasks.
+
+```{r}
+nc <- NbClust(wine.data.scaled, min.nc=2, max.nc=15, method="kmeans")
+table(nc$Best.n[1,])
+```
+
+The table shows the number of clusters in the top row, and the number of indices that reported that clustering as "best" in the bottom row. Note not all number of clusters are reported.
+
+The plots should correlate (roughly) with the table output. The Dindex is like the wss plot, and the second differences plot shows the changes in Dindex. 
+
+Q14(2pts): What is the best number of clusters overall reported by NbClust- according to the table? How many indices reported that number as best?
+
+> Three. 19 indices reported that 3 is the best number of clusters.
+
+
+How to judge the relevance of the clustering? A wine chemist or wine producer (vinter) would probably like to know what the clusters mean in terms of the vine species. To address this, we have a label: the Cultivar column in the original data. There were three levels of this factor: 1, 2, 3. We don't have the names of the cultivars, and we assume this could be looked up from another source. It would be good to ask for the names so they could be included in a report, but we'll leave that for another time. 
+
+Since three clusters was suggested by the NbClust call, we can look at the distribution of Cultivar labels for each of the three clusters. If there is some relationship, we should see a non-random prevalence of the cultivars for each column. Note that there may or may not be any relationship at all. A domain expert would be able to comment on this aspect of the data.
+
+How can we assess if there is a statistically significant relationship between cluster membership and label? Recall that for categorical data we can use frequency counts and a contingency table. Then, a chi square test can be run.
+
+Q15(2pts): Create a contingency table by calling the table function and passing in the Cultivar column from the wine.data data frame and the cluster assignments from the fit object, fit.km3, obtained from calling kmeans with three clusters. What is the attribute that stores the cluster membership? See ?kmeans, the Value part.
+
+Assign the table to a variable called "cont.table". Print the table, then perform the chi-square test on the table.
+(a reference: http://www.sthda.com/english/wiki/chi-square-test-of-independence-in-r)
+Remember the null hypothesis for the chi-square test on the table and what a p-value indicates about the table in terms of the null hypothesis.
+
+```{r}
+cont.table <- table(wine.data$Cultivar, fit.km3$cluster)
+cont.table
+chisq.test(cont.table)
+```
+
+Q16(4pts): How many matches and mismatches are in the table? Was the result of the chi-square test significant? Based on the table values and the results of the chi-square test, what do you think about the relationship between the clusters in the data and the Cultivars? 
+
+>matches: 172 , mismatches: 6. Yes, the result of the chi-sq test is significant. The relationship between clusters in the data and the Cultivars is strong.
+
+
+The following statement calls the "randIndex" function in the "flexclust" library. This function calculates the Adjusted Random Index, or ARI, on two sets: the labels and the cluster assignments. It provides a measure of similarity between the two. It ranges from -1 to 1, where 1 means the sets are the same and -1 means they are completely different.
+
+```{r}
+randIndex(cont.table)
+```
+
+Q17(2pts): What is the ARI value returned by the randIndex function? Does the output of the above call, the ARI index, agree with your conclusions about Cultivars and the clusters? 
+
+>0.897495. Yes, the ARI index agrees with my conclusion about Cultivars and the clusters.
+
+
+#### Part 2. Partitioning around the Medioids- PAM
+
+PAM is an updated version of k-means. The term "medioid" refers to a data point within a cluster for which the sum of the distances between it and all the other members of the cluster is a minimum. K-means calculates a distance between points, while PAM is more general in that is can incorproate any measure of "dissimilarity". It is thought by some that using data points instread of geometric coordinates as cluster centers yeilds a more interpretable result.
+
+Note: a centroid is a spatial, or geometric coordinate as opposed to a medioid, which is an actual data point.
+
+The PAM algorithm is generally the following steps, although there are different versions:
+
+Given a data set and a number of clusters, k:
+1- choose k data points as medioids (cluster centers) at random.
+2- assign each data point to the cluster center it is closest to.
+3- as long as the "cost*" is decreasing, do the following (this is a "while" loop):
+4- move the cluster center to the average point for all of its member data points.
+5- repeat steps 2 and 3 until there are no cluster reassignments or until some stopping criterion is met.
+
+* The cost is computed by some function. It coulds be the sum of the distances (dissimilarities) of points to their medoid.
+
+Let's compare the previous results for k-mean from Part 1 with the PAM clustering algorithm.
+
+First, this statement calculates a distance matrix using the euclidean metric:
+
+```{r}
+dist.mat<-daisy(wine.data.scaled,  metric="euclidean")
+```
+
+Then a call to the "pamk" function, which will provide us with the optimal number of clusters using PAM. The "nc" attribute shows the best number of clusters.
+```{r}
+pk <- pamk(dist.mat, krange=2:15, usepam=TRUE, diss=TRUE)
+pk$nc
+```
+
+Q18(3pts): What does PAM say is the best number of clusters? Does the output of pamk agree with the results above? Based on what you know about how k-means and PAM work, would you expect then to agree?
+
+> PAM says the best # of clusters is 3. Yes, the output of Pamk agrees with the results above. Yes, I would expect them to agree.
+
+
+Now the pam function is called using the distance matrix that was calculated above and three clusters. The fitted model is passed in to the plot function. This generates a "silhouette"" plot. 
+
+```{r}
+fit.pam = pam(dist.mat,3)
+plot(fit.pam)
+```
+NOTE: If this plot does not display well in the "Plots" tab on the lower right, make that window larger by resizing it. To see the plot well, pipe the output of the plot function to an image file, such as a jpeg. The following code will do this:
+jpeg("MYPLOT.jpg")
+plot(fit.pam)
+dev.off()
+
+The code above will create the file "MYPLOT" in your working directory (you can give another path if you wish, and name the file what you wish). The call to dev.off returns the output to the normal setting.
+
+The silouette plot is interpreted as follows: 
+Each cluster member is represented as a grey horizontal line. The length of the line is its "silhouette width", a measure of how well it fits with its cluster. Large, positive values are good. The numbers on the right are the number of cluster members | average silhouette width. Negative lines indicate poorly fitting members- they could probably just as well go in another cluster, or they may not really fit well into any cluster.
+
+Finally, this is a graphical view of the model clusters in terms of the top two variance components:
+
+```{r}
+clusplot(fit.pam)
+```
+See the previous note about outputting a plot to an image file so you can see it better.
+Remember that the plot is showing the top two variance components of 13-dimensional data.
+
+#### Part 3. Model-based Clustering with the mclust Library
+
+In model-based clustering, we do not specify a number of clusters. The data is viewed as a mixture of one or more distributions, the mean of each is a cluster center. 
+(see https://en.wikipedia.org/wiki/Mixture_model for more on this topic)
+The algorithm attempts to discover the means of distinct distributions in the data. This is a more complex process than k-means. There are many ways to "discover" distributions. Often, many "models" will be used to determine the best mixture. Note that the extreme outcome would be to say that the number of clusters equals the number of data points! This is the clustering analogue to overfitting a model in classification.
+
+We'll use the mclust library to do our model-based clustering of the wine data set.
+
+The Mclust function in the mclust library performs model-based clustering for a range of models and a variety of values of k, the number of clusters (this may take a minute or two to run):
+
+```{r}
+wine.cluster <- Mclust(wine.data.scaled)
+```
+
+The Mclust object returned by the Mclust function call contains information about the results of the clustering: the optimal model type (see the Notes on clustering or consult the mclust documantation file for a list of all models), the optimal number of clusters, as well as the number of data records included in each cluster.
+
+```{r}
+summary(wine.cluster)
+```
+
+Q19(2pts): Based on the output produced, how many clusters did the model-based clustering find? What is the largest cluster (most data points)? The smallest(least data points)?
+
+> Three clusters. The largest cluster is 2, and the smallest cluster is 3.
+
+
+The BIC (Bayesian Information Criterion) criterion is used to help select models with lower complexity, and to avoid overfitting the data. 
+
+Q20(2pts): From the summary, which model is reported as best (write the three capital letters)? What is the BIC score for this model?
+
+
+> VVE. The BIC Score for this model is -5403.829.
+
+
+This statement produces a graphical representation of the clustering results for all 14 models used by Mclust.
+
+```{r}
+plot(wine.cluster, data=wine.data.scaled, what="BIC")
+```
+
+The graph reports the BIC scores for all models on the vertical axis and the number of clusters on the horizontal axis for all models. 
+
+The optimal model was reported in the summary. On the graph, locate the model with the highest BIC score. The highest point occurs at a specific number of clusters.This correlates to the result printed in the summary. 
+
+#### Visualizing the clusters
+
+The data has 13 dimensions, too many to graph easily. In order to visualize the clusters in 2D space, we can find the 2 principle components (PC), of the data and use those as plotting axes. Principle components are linear "axes" of variance in the data. Each PC is orthogonal to the other PCs. The first PC has the greatest variance, and so on. By using the first two PCs we are using two dimensions that describe most of the variance in the data (This is what the other cluster plotting functions such as plotcluster and clusplot do to represent the clusters in 2D). 
+
+First, use the "princomp" to calculate the principle components of the data. 
+(You can print the summary of wine.pc object to get a look at the Proportion of Variance explained for all of the PCs in the data if you wish).
+
+```{r}
+wine.pc <- princomp(wine.data.scaled, cor=T)
+```
+
+Next, we'll set up colors to represent each cluster, from 1 to 4.
+```{r}
+my.color.vector <- rep("blue", times=nrow(wine.data.scaled))
+my.color.vector[wine.cluster$classification==2] <- "red"
+my.color.vector[wine.cluster$classification==3] <- "green"
+my.color.vector[wine.cluster$classification==4] <- "orange"
+```
+
+Finally, plot the clusters using the Cultivar as the label for each data point.
+
+```{r}
+plot(wine.pc$scores[,1], wine.pc$scores[,2], ylim=range(wine.pc$scores[,1]), 
+     xlab="PC 1", ylab="PC 2", type ='n', lwd=2)
+text(wine.pc$scores[,1], wine.pc$scores[,2], labels=wine.data$Cultivar, 
+     cex=0.7, lwd=2, col=my.color.vector)
+```
+Compare this plot to the 3-cluster plot produced by plotcluster after Q9 above.
+
+Q21(4pts): Summarize the results of the three clustering techniques, k-means, PAM, and model-based. How many clusters did each report as best? Do the number of clusters relate to the number of cultivars? If so, how does cluster membership correlate with the cultivar: are cluster members mostly of the same cultivar(cite previous results such as Q15)? What do these results say about the relationship between the 13 chemical observations and the cultivars? 
+
+> All three reported three clusters are best for the data.  Yes, the clusters relate to the # of Cultivars. Cluster members are typically of the same Cultivar. These results say that the relationship between the 13 chemical observations and the cultivars is that the cultivars pretty accurately cluster the observations.
+
+
+
+

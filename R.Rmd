@@ -1,0 +1,346 @@
+---
+title: "Intro to R Activity"
+author: "aaron tsui"
+date: "2/5/2021"
+output: html_document
+---
+### Activity: Introduction to R
+
+### List of Topics:
+1. R Markdown files
+2. The Working Directory.
+3. Reading a data file.
+4. Clearing the Global Environment.
+5. Exploring a dataframe and Summary stats.
+6. Manipulating columns, subsetting.
+7. Factors and Labels.
+8. Basic plots.
+9. Knitting an Rmd file.
+
+## R Markdown
+
+This is an R Markdown document, or Rmd file. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+Activities in this course are done in an R Markdown file format as are the labs. You will submit an HTML (or pdf) file that is generated from your Rmd file by executing a "Knit" function.
+
+An R Markdown file allows for the R code to be run and the output rendered a professional, human-readable format, such as HTML or pdf. 
+
+You can embed an R code chunk like this:
+
+```{r}
+print('This is an R code chunk.')
+```
+
+For more about R code chunks, see:
+https://rmarkdown.rstudio.com/lesson-3.html
+
+NOTE: Go to the settings icon, the "gear" icon above, select the dropdown options, and choose the "Chunk Output in Console". This will avoid problems knitting and with running some R library code.
+
+If you are just writing R code with no formatting goals, then you could use an R script file. An R script file is just a text file that contains R code and has a .R extension. For a little more on this topic, see:
+https://cran.r-project.org/doc/contrib/Lemon-kickstart/kr_scrpt.html
+
+Note that R script files would not have the R code chunks we use in the Rmd files. All non-executable text, such as these sentences, would need to be commented with a # symbol. Note that the # symbol outside of R chunks in an Rmd file is purely for test formatting.
+
+### The Working Directory. 
+
+When R, and Rstudio, runs, it uses a directory (folder) on your machine as a reference point. This is called the "working directory". The default working directory is typically the "Documents" folder, but can depend on how R was installed. The current working directory can be seen by executing the getwd function. You can run this statement by placing your cursor at the end of the line, or by selecting the line, and then clicking on the "Run" menu above.
+
+```{r}
+getwd()
+#setwd("/Users/gordon/Documents/CSUmass/courses/INFO248/Activity 1")
+```
+
+You can also see and change the working directory in RStudio by selecting the "tools" menu, then select Global Options... from the drop down.
+
+You can always provide the full path to a file on your machine. For example, if the file myData.csv was not in the working directory, you could use the absolute path in your code instead of just the file name.
+
+For example, consider the code to read in a csv file :
+
+mydata <- read.csv("myDataFile.csv")
+
+You can also use the absolute path to a file:
+windows
+mydata <- read.csv("C:/Users/gordon/Documents/courses/INFO248/datasets/myDataFile.csv")
+mac
+mydata <- read.csv("/users/gordon/Documents/courses/INFO248/datasets/myDataFile.csv")
+
+Use of absolute paths is not a good practice because the code is not portable to other locations. You can embed code to set a working directory for each R file you are working in.
+
+There are two ways to change the working directory in RStudio:
+The function setwd, and, as stated above and the recommended way, Tools menu/Global Options..., then browse to the directory you want. Apply and OK.  Check with getwd(). 
+
+The knit function, which renders the Rmd file as HTML or pdf, uses the directory of the Rmd file by default as the working directory. Alternatively, you can explicitly set the working directory for knit with the following chunk in your Rmd files:
+
+```{r setup}
+#knitr::opts_knit$set(root.dir = 'my/path')
+```
+-where you replace 'my/path' with the path to your resources/files needed in the markdown file.
+If this doesn't work, then place the files you need in the same directory as the Rmd file.
+
+### Reading data from a file.
+
+The read.table function (execute ?read.table in the R console below for the documentation page) takes several arguments, including the name of the file, a delimiting character, and whether or not the first line in the file is a header or not. A header is a row that contains column names instead of data. The read.table function returns a data frame object that contains the contents of the file, if it has been found and successfully processed.
+
+This statement reads the file "FlightDelays.csv". The file extension, "csv", means the data is delimited, or separated, by the comma character. This is a very common form for data files.
+This file is small enough that you can also open the file with a speadsheet app if you want to view its contents. 
+
+Execute the statement below, then look in the Global Environment pane in the upper right.
+
+```{r}
+df.delays1 <- read.table("FlightDelays.csv", sep=",", header=TRUE)
+```
+Notice the Global Environment pane in the upper right shows that the object df.delays1 was created. You can expand that entry to inspect the object, or double-click on it to have it display in this pane. Notice the column names in the dataframe object. These were parsed from the header row in the file.
+
+A common problem: the file does not have a header, but the header parameter is set to TRUE.
+Execute the statement below and inspect the dataframe in the Global Environment. Compare it to the df.delays object. This is an incorrectly formed dataframe and will cause errors. 
+
+```{r}
+df.delays.nh.bad <- read.table("FlightDelaysNoHeader.csv", sep=",", header=TRUE)
+```
+
+What about a file that does not have a header row? You can set the header parameter to FALSE.
+Execute this statement and inspect the resulting dataframe object:
+```{r}
+df.delays.nh.good <- read.table("FlightDelaysNoHeader.csv", sep=",", header=FALSE)
+```
+This dataframe is correctly formed. Notice that the column names are V1 to V10 as there are no names provided in a header row. You can add column names, or refer to a column by its index number. Column names are very useful for people, but machine learning algorithms do not need them, and so some data sets do not have header rows.
+
+#### Clearing the Global Environment.
+You can clear all objects that have been created by clicking the broom icon above the Global Environment pane. Be sure to select the "Include hidden objects" option. Do that now. You will see that the objects have been cleared. Sometimes you will have issues with objects retaining links to other objects as you work on your code. You can reset the environment and then re-establish the objects by executing the code chunks, one at a time.
+
+Finally, because csv is such a common format, you can use the read.csv function instead of read.table.
+You do not need to specify the separator character, and you do not need to include the header parameter if the file contains a header. If the file does not have a header, you have to include the header=FALSE parameter.
+Execute the following statement and inspect the object.
+```{r}
+df.delays <- read.csv("FlightDelays.csv")
+```
+
+### Exploring a dataframe and Summary stats.
+
+A data frame is a 2 dimensional structure, like a matrix, except that it can contain vectors of mixed data types. They do have to be the same length, however. Some data files will have columns with different lengths. They will cause an error when you attempt to read them in.
+
+Now, you have the df.delays object in your environment. Let's explore a few handy functions to explore it.
+Of course, it is easy to use the view in the Global Environment pane to see the structure of the dataframe. The
+following five functions give you a little practice in using R functions, which is good practice to get used to R.
+
+The dim function returns a vector, where the first value is number of rows in this data set, and the second value is the number of columns in this data set.
+```{r}
+dim(df.delays)
+```
+
+You can also use the nrow and ncol functions to get the number of rows and columns in the dataframe:
+```{r}
+nrow(df.delays)
+ncol(df.delays)
+```
+
+The "names" function prints the column names:
+```{r}
+names(df.delays)
+```
+
+The "head: function shows the header and the top 6 rows of the data set:
+```{r}
+head(df.delays)
+```
+
+Displays the columns and top data vertically:
+```{r}
+str(df.delays)
+```
+Notice that there are 5 columns that contain numeric data and 5 columns with categorical data. In R, categorical data is called "Factor" data. The unique values a factor can have are its "levels". You will work with converting a column later on in this activity.
+
+The "summary" function displays descriptive statistics on the entire data frame. Note that it presents frequency counts for categorical data ("factors"). Summary statistics are the min, max, mean, median, and quartiles. For categorical variables you will see frequency counts instead.
+```{r}
+summary(df.delays)
+```
+
+NOTE: In some versions of R, columns will be read in as "chr" instead of "Factor". If this is the case, and you want them to be treated as factors, then run this code next (more on factors and levels below).
+Run the following code and check that the data types for these columns changes tom"Factor". There are other columns that should be changed, but you will do that later on in this activity.
+
+```{r}
+df.delays$Carrier <- factor(df.delays$Carrier)
+df.delays$Day <- factor(df.delays$Day)
+df.delays$Month <- factor(df.delays$Month)
+df.delays$Destination <- factor(df.delays$Destination)
+```
+Accessing a single column using the "dereferencing" operator: You can use of the $ symbol and the column name to refer to a specific column by name. The same column can also be accessed by its index in the second statement.
+```{r}
+summary(df.delays$FlightLength)
+summary(df.delays[,8])
+```
+A column in a dataframe can be thought of as a vector. In fact, R is a vector based language, which is very useful for manipulating datasets.
+
+Note that the standard deviation, a useful statistic, is not included in the summary function output and requires a separate call:
+```{r}
+sd(df.delays$FlightLength)
+```
+
+### Manipulating columns, subsetting.
+
+You will need to be able to manipulate columns (vectors) in a dataframe and take subsets. The following is a brief overview of some common methods. Note: before changing the original dataframe, you might consider making a copy in case you want to "roll back" to the original version, such as a variable names "df.delays.orig". Alternatively, you can always clear out the Global Environment and start over.
+
+Removing a column from a dataframe:
+The first column are just index ID numbers, so we remove that column from the data frame. Note that this will shift the index of all columns down one.
+```{r}
+df.delays <- df.delays[,-1]
+names(df.delays)
+```
+
+Find all values in a column that satisfy a logical function. 
+For example, we want to see all of the values for Delay that are greater than 200. Each row in the Delay column is checked to see if it satisfies (returns TRUE) the expression in the brackets. If it does, it is included in the return. You can also assign this output to a vector variable. The length of this vector is displayed in the console, and then the vector itself is displayed. Notice the delays.gt200 appears in the Global Environment pane. 
+
+```{r}
+delays.gt200 <- df.delays$Delay[df.delays$Delay > 200]
+length(delays.gt200)
+delays.gt200
+```
+
+Reassigning all rows in a column that contain a specific value can be done with bracket notation. The syntax is to start with the column name, then place the logical statement that tests for the value you want to identify, then assign the new value to the statement on the left-hand side.
+
+For example, you can see from the summary stats for FlightLength that there is at least one data point with a zero value. We do not know if this is a data entry error or if the zero value means the value for flight length was not recoded, or missing. We will assume the latter and change the zero value to NA, which R uses to indicate a missing value. 
+
+First, let's see how many zero values for flight length exist in the data set, then assign NA to those entries:
+```{r}
+df.delays$FlightLength[df.delays$FlightLength == 0]
+df.delays$FlightLength[df.delays$FlightLength == 0] <- NA
+df.delays$FlightLength[is.na(df.delays$FlightLength)]
+```
+
+Now, check that this happened. You cannot use == NA as a test because of the way that value is respresented in R, so, to test for the NA values, you use the is.na() function:
+```{r}
+df.delays$FlightLength[is.na(df.delays$FlightLength)]
+```
+Let's remove these rows from the dataset by using the na.omit function:
+
+```{r}
+df.delays <- na.omit(df.delays)
+```
+
+You can check that 2 rows were removed by consulting the the Global Environment or with the nrow function.
+
+A statement that calculates the proportion of flight delays that are greater than 150:
+
+```{r}
+length(df.delays$Delay[df.delays$Delay > 150])/nrow(df.delays)
+```
+This is less than 2%
+
+Use of the subset function:
+The subset function is used to create a new data frame that is a subset of the original. Use the "select" parameter to pass in a vector of column names to include "Carrier","FlightLength", "Delay" in the subset. 
+```{r}
+df.new1 <- subset(df.delays, select= c("Carrier","FlightLength", "Delay"))
+summary(df.new1)
+```
+
+This more complex example selects the same three columns as above, but only rows that satisfy the constraint that Carrier is "AA". Call the dataframe df.new2.
+
+```{r}
+df.new2 <- subset(df.delays, Carrier=="AA", select=c("Carrier","FlightLength", "Delay"))
+summary(df.new2)
+```
+
+### Factors and Levels
+Factors in R represent categorical data, where the values fall into discrete categories, or bins.
+The possible values of a factor are called levels. The levels can be numbers or strings. You can assign labels to the levels for human-friendly output. This minimizes errors. For example, if you were working with a data set that coded males as 0 and females as 1 (assuming other gender designations were not included), it would be easy to forget what 0 or 1 meant. These levels could be labeled as "male", "female" to avoid confusion. 
+
+In the flight delays data set, you can see that the column FlightNo is treated as a numeric data type- int to be exact (check this in the the Global Environment). You can also see this by looking at the summary for FlightNo- instead of frequencies you see the numeric stats. Since you would not ever want to use this data for any calculations, it should be categorical instead of numeric.
+
+This change is made by using the factor function:
+```{r}
+df.delays$FlightNo <- factor(df.delays$FlightNo)  
+df.delays$DepartTime <- factor(df.delays$DepartTime) 
+summary(df.delays$FlightNo)
+summary(df.delays$DepartTime)
+```
+
+Another column that should be categorical is Delayed30. If the flight was delayed 30 minutes or more, this column recods 1, otherwise 0. We can make this column a factor and add labels "No" and "Yes" to indicate 0  or 1 respectively. Be careful about the order of the labels as the numbers are mapped to labels in ascending order on the numbers. 
+
+```{r}
+df.delays$Delayed30 <- factor(df.delays$Delayed30) 
+levels(df.delays$Delayed30) <- c("No","Yes")
+# check
+summary(df.delays$Delayed30)
+```
+
+Note that we set the actual levels to "No" and "Yes". You can add labels without setting different level values. See the "Factors in R- Example of levels and labels." file linked on the Moodle course page for more details.
+
+### Basic plots.
+The plot function is an easy way to create simple plots in R. It is especially useful when you are exploring a dataset and do not want to produce a polished graph or chart. We will look at other libraries for plotting later on. 
+
+The plot function will produce different plots based on the type of data that is passed to it. Let's lok at the DepartTime column. This is an example of categorical data, which you can see by inspecting the data, either in the Global Environment pane or by looking at the summary. This column should be rendered as a bar chart when it is passed in to the plot function. If the DepartTime column is not already a factor, you will want to make it a factor in the dataframe before plotting it.
+```{r}
+df.delays$DepartTime <- factor(df.delays$DepartTime)
+plot(df.delays$DepartTime)
+```
+
+And numerical data:
+```{r}
+plot(df.delays$FlightLength)
+```
+
+This plot is not very readable. The data points are represented by o characters, which takes up a lot of space. We can see that the values tend to be grouped by the fact that so many have the same values- a "stepped" look, but we would like to have the groups consolidated. We can improve the redability by applying the sort function, and by adding a graphical parameter that uses a different character to represent data points.
+
+You can also use numbers instead of the actual character. See the table on this page for more:
+https://www.statmethods.net/advgraphs/parameters.html
+```{r}
+plot(sort(df.delays$FlightLength), pch=".")
+```
+
+This plot uses more graphical parameters: a title to the plot, labels to the axes, and a horizontal, dotted, red line that shows the average flight length.
+
+```{r}
+plot(sort(df.delays$FlightLength),
+     ylab = "Length(miles)", xlab = "Flights",
+     main = "Flight Lengths")
+abline(h=mean(df.delays$FlightLength), col = "red", lty = 3)
+```
+
+### Histogram and Density plots
+A histogram shows the distribution of values in a discretized manner. The histogram's columns, or "bins", group the numerical data. The number of bins can be adjusted: more bins = more detail. Sometimes too few bins will hide the true shape of the data. You can set the number of bins by adjusting the breaks parameter. For more, you can access the help page with the statement: ?hist
+
+```{r}
+hist(df.delays$FlightLength)
+```
+
+Another way to view the shape of a distribution is to create a density plot. While a histogram is a "discretized" view of a distribution, a density plot is a continuous view of the data. We will discuss density and "smoothing" later on in the course.
+Notice the parameter, na.rm=TRUE for the density function. Some functions in R need to be told to ignore NA values. If the column does not have any NA values, or if all NA values have been removed, you would not need this parameter.
+
+```{r}
+plot(density(df.delays$FlightLength, na.rm=TRUE))
+```
+Notice the shape of the desity curve follows the height of the bins in the histogram.
+
+### Bivariate plots
+You often want to explore the relationship between two variables. A scatter plot is a great way to see how two variables interact, or not.
+About the "attach" function. This function will make a data source available to the namespace. This means that the df.delays dataframe will be attached to the R session as a data source so you do not have to use the data frame with the $ symbol before each column name. You can just use the column names. This makes the syntax easier to write, read, and debug. Be careful to detach afterwards to avoid problems with other data sources.
+
+```{r}
+attach(df.delays)
+plot(FlightLength ~ Delay)
+```
+
+The plot seems to show lesser delays as flight length increases.
+
+Finally, the code below will generate two box and whisker plots, one with the distribution of flight lengths for delays < 30 minutes, and one for delays >= 30 minutes. The details of box and whisker plots is covered in the material on stats in this course, and in basic stats courses. The bold black line is the distribution median, the box is the interquartile range, and the whiskers are the min and max.
+The data frame is detached afterwords.
+
+```{r}
+plot(FlightLength ~ Delayed30)
+detach(df.delays)
+```
+
+### Knitting the Rmd file.
+After you have verified that your R code runs correctly, you can convert the Rmd file into an HTML file by clicking on the Knit drop down menu at the top of Rstudio and select "Knit to HTML". You will see some output from the knit function scrolling by. If there are no errors, you will see the HTML file appear. The file is written to the same directory as the Rmd file.
+
+Note: You can knit to pdf; however, that may involve a lot of extra installation work and for this course we are not requiring that. We will accept either HTML or pdf file formats.
+
+Inspect the HTML file to make sure that it looks the way you intend, make any changes to the Rmd file if necessary and re-knit. You will submit all of your R assignments as knitted files, either HTML or pdf format. 
+
+If any of your R code does not run, or if a file that you are reading cannot be found, you will see error messages in the "R Markdown" tab below. Click on the "Output" option for datails and line numbers for debugging.
+
+A common problem is that the knit function ignores the Rstudio working directory. If you are reading files you can set the knit working directory (see above), or place the file in the same directory as the Rmd file.
+
+Note: when you are done with an R session and close Rstudio, it asks if you want to save the workspace. Do not save the workspace. You want to start with a clean workspace each time as you will be working on many different assignments and you can alwayd recreate your session by running the R code.
+
+Now, knit this file to make sure it is working and you will be all set!

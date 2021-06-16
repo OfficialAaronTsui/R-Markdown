@@ -1,0 +1,232 @@
+---
+title: "Lab 3-1"
+author: "Aaron Tsui"
+output: html_document
+---
+
+### Multiple Linear Regression (94 points)
+
+The columns in the mtcars dataset are described below:
+
+mpg 	Miles/(US) gallon
+cyl 	Number of cylinders
+disp 	Displacement (cu.in.)
+hp 	Gross horsepower
+drat 	Rear axle ratio
+wt 	Weight (1000 lbs)
+qsec 	1/4 mile time
+vs 	V-shaped engine=0, Straight engine=1 (cylinders in a line).
+am 	Transmission (0 = automatic, 1 = manual)
+gear 	Number of forward gears
+carb 	Number of carburetors 
+
+You may look up other R datasets here:
+https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/00Index.html
+
+Q1(5pts): Fit a linear model to the mtcars data set. Make mpg the outcome, and weight, horsepower, number of cylinders be the covariates.
+Call the summary function on the fitted model object to show the output info.
+ 
+```{r}
+data(mtcars)
+fit <- lm(mpg ~ wt + hp + cyl, data=mtcars)
+summary(fit)
+```
+
+Q2(5pts): Say which of the covariates seems to have the biggest influence on mpg? What evidence in the output supports your answer?
+
+> Weight has the biggest influence on MPG, because MPG changes the most for every additional unit of weight as compared to horsepower and cylinders.
+
+
+Q3(5pts): What change on mpg would we expect to see if we added one cylinder to an engine- holding hp and wt constant?
+
+> MPG would decrease by 0.94162.
+
+
+Q4(2pts): What percent of the variance in the data is "explained" by this model?
+
+> We use the Adjusted R-squared for this, and it comes out to be 82.63% of the data is explained by this model.
+
+
+Q5(2pts): According to the output, what is the standard deviation of the errors from the fit?
+
+> 1.78686.
+
+
+Q6(5pts): Display a plot of the residuals vs the fitted values- you can get these vectors from the fit object. Add a horizontal line at 0. The points should be evenly dispersed above and below the line with no noticeable pattern.
+
+```{r}
+plot(fit$fitted.values, fit$residuals)
+abline(h=0)
+```
+
+##### Feature selection.
+
+What features (covariates) should we include in the model? One thought is to eliminate all features with a significance (p-value) higher than some threshold- typically .05. Note that it may be important to retain some or all of the features as they may show their relationship to the outcome (through their estimated coefficient). Remember that one use of a linear model is to see how certain features of interest affect the outcome.
+
+There are two methods for selecting features based on their p-values: forward selection and backward elimination. In forward selection, features are added to the model one at a time starting with one feature. A feature is retained if its p-value is less than the threshold. Backwards elimination starts with a model that includes all features. At each step, the feature with the highest p-value is removed. The elimination stops when all features are significant.
+
+Some caveats:
+- there is a lot of interaction between features, and p-values are not 100% trustworthy.
+- p-values become lower for the remaining features when one feature is removed, inflating their importance.
+- this tends to produce smaller models that might not be useful for explaining the research question. Again, the goal may be to explain a phenomenon, not predict it. 
+
+Let's manually step through a backwards elimination.
+
+Q7(2pts): Fit this model of the mtcars data set:  mpg~cyl+disp+hp+drat+wt+qsec+vs+am+gear+carb and display the summary.
+
+```{r}
+fit.2 <- lm(mpg~cyl+disp+hp+drat+wt+qsec+vs+am+gear+carb, data=mtcars)
+summary(fit.2)
+```
+
+You will see that cyl has the highest p-value, so remove it, refit and display the new model summary. This is accomplished with the following statements:
+```{r}
+fit.2 <- update(fit.2, . ~ . -cyl)
+summary(fit.2)
+```
+
+Q8(2pts): Now, continue to remove individual features in the same manner until you have only features with p-values less than .05. (Don't remove the intercept).
+Don't enter the individual update statements you execute here, but enter the formula for the model you end up with:
+
+> mpg ~ wt + hp
+
+
+Q9(4pts): Now enter the statement that fits your final model along with the call to summary:
+```{r}
+fit.3 <- lm(mpg ~ wt + hp, data=mtcars)
+summary(fit.3)
+```
+
+Notice the model error did not change very much. This process did select features with the most "explanatory" power- at least measured by p-values, but did not alter the basic error of the model.
+Also be aware that different combinations of features can result in different significance levels.
+
+##### Automated model selection.
+We will use an automated method for model selection that uses the Akaike information Criterion, or AIC as part of its assessment of model quality. AIC rewards goodness of fit (as assessed by the likelihood function), but it also includes a penalty that is an increasing function of the number of estimated parameters.
+
+Let L be the maximum value of the likelihood function for the model. 
+let k be the number of estimated parameters (including any constants that are estimated, such as the intercept in linear regression models) in the model. 
+
+The AIC value of the model is described by the following equation:
+
+    AIC = 2k - 2\ln(L)
+
+Given a set of candidate models for the data, the preferred model is the one with the minimum AIC value. AIC rewards goodness of fit (as assessed by the likelihood function), but it also includes a penalty term, 2k, that is an increasing function of the number of estimated parameters. This will result in good models with fewer parameters.
+
+The following code fits a model with all features (notice the abbreviated formula). Then, the automated stepwise selection is invoked by the call to step.
+
+```{r}
+fit<- lm(mpg~., data=mtcars)
+step(fit)
+```
+
+Q10(4pts): Get the final formula from the output displayed by step. Notice any difference to the model found by backwards elimination. Enter statements below to create the fit using this formula and display the summary.
+
+```{r}
+fit.4 <- lm(formula = mpg ~ wt + qsec + am, data = mtcars)
+summary(fit.4)
+```
+
+Q11(8pts): Read in the file: state_data.csv. Look at the first few rows of the data set. Before you do anything, remove the first column as the state names are non-numeric and cannot be processed by the step function. 
+Next, fit a model using all of the variables. Note that instead of typing all of the column names, you can abbreviate them with a period afer the tilde. The formula in this case would be: Life.Exp~.
+Finally, call summary to see the fit output, then call step passing in the fit object. 
+
+```{r}
+df.sd <- read.csv("state_data.csv", sep=",", header=TRUE) #sdc = state data csv
+df.sd <- subset(df.sd, select=-State)
+df.sd.lm <- lm(Life.Exp~. , data=df.sd)
+summary(df.sd.lm)
+```
+
+Q12(5pts): Write the statements that will fit the model selected by step and call summary. Compare with the full model above.
+
+```{r}
+fit.5 <- lm(formula = mpg ~ wt + qsec + am, data = mtcars)
+summary(fit.5)
+```
+
+Q13(2pts): How much did population's p-value change from the full model to the final model?
+
+> The final model has a much smaller p-value as compared to the full model.
+
+
+##### Model prediction.
+
+Q14(6pts): Read in the kidiq_data.csv file. Create a dataframe called train.data that consists of the first 344 rows of the data set, and a another dataframe called test.data that consists of rows 345 to 434 of the data set.
+
+```{r}
+kdata <- read.table("kidiq_data.csv", sep=",", header=TRUE)
+train.data <- kdata[1:344,]
+test.data <- kdata[345:434,]
+```
+
+Q15(4pts): Fit a linear model using all features and include an interaction term for mom_hs and mom_iq. Use the training data set from the previous step. Call the fitted object "fit.train".
+
+```{r}
+fit.train <- lm(kid_score ~ mom_hs + mom_iq + mom_work + mom_age + mom_hs:mom_iq, data=train.data)
+
+```
+
+Q16(5pts): Call step to refine the model. Fit the model selected by step and display the summary.
+
+```{r}
+step(fit.train)
+summary(fit.train)
+
+```
+
+Q17(8pts): Now use the predict function to test the model on the test.data set. 
+First, assign the kid_score column from the test.data set to a vector called "actual_scores". 
+Then, assign the call to predict to a variable called "fit.predicted". 
+Make sure you remove the kid_score column from the test.data set when you pass it in to predict.
+Also, use the interval="predict" parameter.
+
+```{r}
+actual_scores <- as.vector(test.data$kid_score)
+fit.predicted <- suppressWarnings(predict(fit.train, subset(test.data, select=-kid_score), interval="predict", level = 0.95))
+fit.predicted
+
+```
+
+How'd we do? One way to judge the generalization of the model is to compare the mean squared error (MSE) for the train and test data sets.
+    MSE = mean((actual_scores - predicted_scores)^2)
+Calculate the MSE for the test and train sets.
+
+The vector created above, actual_scores, are the observed values for the test set. 
+
+Q18(4pts): Assign to a vector called "predicted_scores" the predicted scores from the fit.predicted object. The fit.predicted object is a matrix, so you need to access the "fit" column by bracket notation (you can see this column by calling summary on the fit.predicted object).
+
+```{r}
+predicted_scores <- fit.predicted[,'fit']
+
+```
+
+This code calculates the MSE for the test and training sets and assigns the results to the variables mse.test and mse.train respectively. The residuals from the training set provide the actual-predicted values, so you just have to square them and take the mean.
+
+```{r}
+mse.test <- mean((actual_scores - predicted_scores)^2)
+mse.train <- mean(fit.train$residuals^2)
+```
+
+Q19(8pts): Print the two mse values. Also print the percentage change. 
+%change = mse train - mse test/mse train * 100
+What do they say about the model's ability to predict new data?
+
+To help answer that, run a two sample t-test to see if the two distribution means are the same or if they differ. The distributions are 1- the model errors (residuals) from the training set, which is obtained by fit.train$residuals,and 2- the error from the test set,which is the actual_scores - predicted_scores. 
+
+The t-test will examine the null hypothesis: the difference in the two distribution means are 0. A p-value of less than .05 will reject this hypothesis. If our model generalized well, the distributions are similar, and we accept the null hypothesis, that the two distribution means are the same. 
+The call for the t-test is:  t.test(vector1, vector2), where vector1 is distribution 1 described above, and vector2 is distribution 2 described above.
+
+```{r}
+mse.test
+mse.train
+percent_change <- (((mse.train - mse.test)/mse.train) * 100)
+percent_change
+
+t.test(fit.train$residuals, actual_scores - predicted_scores)
+```
+
+Q20(8pts): Briefly summarize (a sentence or two) the performance of the model we just fitted and evaluated. Mention how well the model fitted the training data, and then how well it generalized in predicting the test data.
+Mention the significance of the coefficients, Rsquared, and mention the difference between train and test distribution means.
+
+>   The model does not fit the training data well. The distributions are not similar. Our p-value of 0.6557 is greater than our alpha of 0.05, which means we fail to reject the null hypothesis. The Rsquared shows how well the regression model fits the data. The difference between train and test distribution means shows how dissimilar the two data sets are.
+

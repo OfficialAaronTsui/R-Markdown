@@ -1,0 +1,202 @@
+---
+title: "Lab 1 Intro to R-solutions"
+author: "aaron tsui"
+output: html_document
+---
+
+### Introduction to R (18 questions, 36 points).
+
+Initial Data Analysis: When you initially acquire a data set, it is important to "get to know" the data by doing some exploratory analysis so you have an idea of how the data is distributed, encoded, and structured. You may need to perform data cleaning: removing or transforming some values, or deal with missing values. This is a critical step that should always be performed.
+
+This lab is about using R to read data from a csv file and prepare it for analysis. As you will see, there are some aspects of a data set that you want to be aware of, especially if the analysis and modeling you plan to use have specific requirements.
+
+Before you begin, here are some basic stats and plots that are useful in initial exploratory analysis:
+
+Basic, descriptive stats: Numerical summaries - means, sds, five-number summaries, correlations. 
+Graphical summaries: single variable - Boxplots, histograms etc. – two variables - scatterplots.
+
+#### Aspects of a data set to be aware of.
+Look for outliers, data-entry errors and skewed or unusual distributions. Are the data distributed as you expect?
+Getting data into a form suitable for analysis by cleaning out mistakes and aberrations is often time consuming. It often takes more time than the data analysis itself.
+
+In this course, most of the data will be ready to analyze but you should realize that in practice this is rarely the case.
+
+### The data set for this lab.
+The National Institute of Diabetes and Digestive and Kidney Diseases conducted a study on 768 adult female Pima Indians living near Phoenix. The following variables were recorded: Number of times pregnant, Plasma glucose concentration a 2 hours in an oral glucose tolerance test, Diastolic blood pressure (mm Hg), Triceps skin fold thickness (mm), 2-Hour serum insulin (mu U/ml), Body mass index (weight in kg/(height in m2)), Diabetes pedigree function- a hereditary risk of getting diabetes, Age (years) and a test whether the patient shows signs of diabetes (coded 0 if negative, 1 if positive). 
+(If you are unfamiliar with some of these terms, a quick lookup is a good idea. A good data scientist should know something about the domain they are working in.)
+
+The data was obtained from UCI Repository of machine learning databases. It is provided for this lab as the file: pima.csv.
+
+Of course, before doing anything else, one should find out what the purpose of the study was and more about how the data was collected. For this lab, we will focus on exploring and processing the data.
+
+This sets the location of the working directory for knit if different from the location of the Rmd file.
+Note: you only need this if the file is not in the same directory as the Rmd file.
+```{r setup}
+#knitr::opts_knit$set(root.dir = '/your path here')
+```
+
+Q1(2pts): Read in the file "pima.csv" and assign it to a variable named pima.df (df for "dataframe"). Use the absolute path to the file if necessary when knitting.
+
+```{r}
+pima.df <- read.csv("pima.csv", sep=",", header=TRUE)
+```
+
+Q2(2pts): To get an idea of the size of the dataset, write R code to print the number of rows and columns in the data set.
+
+```{r}
+ncol(pima.df)
+nrow(pima.df)
+```
+
+Q3(2pts): How many rows are in this dataset?
+
+> 768
+
+Q4(2pts): Write an R statement that displays a summary of the distributions of the values for each column in the pima dataset.
+
+```{r}
+summary(pima.df)
+
+```
+
+### Checking for extreme or unusual values.
+At this stage, we are looking for anything unusual or unexpected perhaps indicating a data entry error. We need to look for any anomalous vales, and also use some critical thinking about what the data measures in the real world; do the values "make sense"?
+
+For this purpose, a close look at the minimum and maximum values of each variable is worthwhile. 
+Starting with the column pregnant, we see a maximum value of 17. This seems like a large number of times to be pregnant but not impossible. We are aware that there are cultural aspects that can lead to baised judgements about the "normal" number of preganacies. In this case, given the rest of the distribution values, 17 seems like an outlier.
+
+Q5(2pts): Write an R statement that shows the proportion of the data that has more then zero pregnancies. This can be the number of values >0 divided by the number of rows in the dataset. You can use the [ ] notation to select values >0. 
+Your answer must be a value between 0 and 1. 
+
+```{r}
+a <- length(pima.df$pregnant)
+pima.df.gtzero <- pima.df$pregnant[pima.df$pregnant > 0]
+b <- length(pima.df.gtzero)
+b/a
+```
+
+Q6(2pts): Based on this number, what can you infer about the gender of the participants in this dataset?
+
+> There are more females than males since a majority of the dataset has been pregnant.
+
+Continuing to look at the extreme (min and max) values in the summary, you can see that the next 5 variables have minimum values of zero. Does a value of 0 make sense for these columns (refer to the description of the columns above)?
+
+In the case of blood pressure, the diastolic column, we know that zero blood pressure is not possible in a living person, so something must be wrong with the data.
+
+Q7(2pts): Write an R statement that displays all of the values for diastolic in sorted order, smallest to largest.
+
+```{r}
+sort(pima.df$diastolic)
+```
+
+### Missing values.
+We see that the first 36 values are zero. There is usually some documentation that comes with a dataset to explain how the data was collected or how missing values were encoded. Since we do not have that information, we have to infer that it seems likely that the zero has been used as a missing value code. For one reason or another, the researchers did not obtain the blood pressures of 36 patients. 
+
+In a real investigation, one would likely be able to question the researchers about what really happened. Nevertheless, this does illustrate one kind of misunderstanding that can easily occur. A careless datascientist might overlook these presumed missing values and complete an analysis assuming that these were real observed zeroes. If the error was later discovered, they might then blame the researchers for using 0 as a missing value code (not a good choice since it is a valid value for some of the variables) and not mentioning it in their data description. Unfortunately such oversights are not uncommon particularly with datasets of any size or complexity. The datascientist bears some share of responsibility for spotting these mistakes.
+
+The next step is to fix the problem of the missing values being coded as zeros for the columns for which zero values do not make sense as actual data, namely: glucose, diastolic, triceps, insulin, and bmi. A little domain knowledge makes for good data science.
+
+In R, NA is used to indicate a missing value. This means that any functions you perform on the data will recognize NA as a missing value. Here is a good reference about missing values in R: https://www.statmethods.net/input/missingdata.html
+
+Q8(2pts): Write five R statements that set all zero values of the five variables to NA. Use the [ ] notation to select the rows where the value is 0.
+
+```{r}
+pima.df$glucose[pima.df$glucose == 0] <- NA
+pima.df$diastolic[pima.df$diastolic == 0] <- NA
+pima.df$triceps[pima.df$triceps == 0] <- NA
+pima.df$insulin[pima.df$insulin == 0] <- NA
+pima.df$bmi[pima.df$bmi == 0] <- NA
+```
+
+### Data types.
+Checking data types of the columns should also be done. Some data is categorical though it may be coded numerically. You can make numerical columns categorical in R and add labels. 
+
+The variable "test" is not quantitative but categorical. Such variables are also called factors. However, because of the numerical coding, this variable has been treated as if it were quantitative. It’s best to designate such variables as factors so that they are treated appropriately. Sometimes people forget this and compute stupid statistics such as “average zip code”.
+
+You can see this problem by looking at the "test" stats in the summary generated in Q4 above. These descriptive stats do not apply to a categorical column. 
+
+Q9(2pts): Write an R statement or statements that changes the "test" column to a factor, and then set levels "negative" for 0 and "positive" for 1.
+
+```{r}
+
+pima.df$test <- factor(pima.df$test)
+
+levels(pima.df$test) <- c("negative", "positive")
+
+ 
+```
+
+
+Q10(2pts): Part 1: Execute the summary function to see the result for the test column as a categorical variable.
+
+```{r}
+summary(pima.df$test)
+```
+
+Part 2: How many negative and positive tests are in the dataset?
+
+> 500 negative and 268 positive tests.
+
+### Simple Plots.
+Now that we have explored the data and made some adjustments, we can continue to explore the data further by creating some simple visualizations, or plots.
+
+Q11(2pts): Write a statement that calls the hist function to create a histogram of the diastolic column.
+
+```{r}
+hist(pima.df$diastolic)
+```
+
+The shape of the histogram shows the values to be roughly normally distributed: the shape of the classic "bell curve". 
+
+Q12(2pts): Write a statement that uses the plot and density functions to generate the density plot for the diastolic column. Include the parameter, na.rm=TRUE.
+
+```{r}
+plot(density(pima.df$diastolic, na.rm=TRUE))
+```
+
+Q13(2pts): What value is the mass of this distribution centered around?
+
+> 72.
+
+Another useful, univariate plot is to plot the sorted data against its index.
+
+Q14(2pts): Write a statement that uses the plot and sort functions to generate this plot for the diastolic column. Add a second parameter to the plot function so the data points are represented by a dot character ".".
+
+```{r}
+plot(sort(pima.df$diastolic), pch=".")
+```
+
+The advantage of this plot is that we can see all the data points themselves. We can see the distribution and possible outliers. We can also see the discreteness in the measurement of blood pressure - values are rounded to the nearest even number and hence we the “steps” in the plot.
+
+### Plots with two variables.
+Bivariate plots show the relationship between two variables. 
+
+Q15(2pts): Write a statement using the plot function that shows diabetes on the vertical axis and glucose on the horizontal axis. Enter your statement below the call to the attach function. This means that the pima.df dataframe will be attached to the R session as a data source so you do not have to use the data frame with the $ symbol before each column name. You can just use the column names. Execute the attach statement as well as your plot statement.
+
+```{r}
+attach(pima.df)
+plot(glucose, diabetes)
+ 
+```
+
+Q16(2pts): If the variable "diabetes" is the hereditary propensity to develop diabetes, and glucose is a measure of blood sugar level, based on the plot, are those with glucose in the 150-200 range more likely to get diabetes?
+
+> No.
+
+Q17(2pts): Finally, write the statement that will generate two box and whisker plots, one with the distribution of diabetes values for the negative test cases, and one for the positive test cases. Note that the pima dataframe is still attached to the session, so you can use just the column names in your code if you wish.
+
+Enter your plot statement above the call to the detach function. Execute this statement after your plot statement. This means the pima.df dataframe is detached. This is a good practice as you want to "clean up" the work session.
+
+```{r}
+#code here
+
+boxplot(diabetes ~ test)
+detach(pima.df)
+```
+
+Q18(2pts): Based on the two box and whisker plots, which are more likely to get diabetes (according to the "diabetes" variable): negative or positive tests ?
+
+> Positive tests are more likely to get diabetes.
+
+That is the end of this activity. You have imported a dataset, explored the values and made some transformations to some of that data. You then generated a few exploratory plots to visualize the distribution of a single variable and the relationship between two variables.
+Knit this file and submit it to the lab 1 assignment.

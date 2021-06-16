@@ -1,0 +1,405 @@
+---
+title: "Activity- Decision Trees"
+author: "Aaron Tsui"
+output: html_document
+---
+
+### Decision Trees (20 questions, 47 points)
+
+Decision trees are non-linear partitioning-type models. They work by partitioning, or splitting, the data into subsets, which are again split into smaller subsets, and so forth until a stopping criterion is met. The last partitions are called the "leaves", "terminal nodes", or "leaf nodes" of the tree. The tree building algorithm chooses a variable to use as a splitting criterion for each "node" in the tree. The choice of variable is made by assessing some measure of "purity" achived by the split. Purity means how "mixed" the partitions are in terms of the predicted variable. When built, a tree defines a set of rules, where each sequence of rules define a path from the root node to a terminal node, which provides a prediction.
+
+In model fitting, one always thinks about the balance between bias and variance, or generality and overfitting. what does an overfit model looks like? In the case of decision trees, a perfectly overfit model is one with a single data point in each leaf node. We want to avoid that as it does not tell us anything about the data.
+
+#### Regression and Categorical Tree Models
+Decision trees can work with both numeric and categorical data as input and output. Trees that predict numeric values are called "regression trees", and those that predict categorical values are called "classification trees".
+
+In R there are many libraries that create tree models. Two common libraries are "rpart" and "tree". Install these libraries (in the console, not in the markup file.) and then execute the statements below to load them into your environment. If you need to install these libraries, do not include those statements in this file. Also not the variable seed.val to be used whenever random numbers need to be generated. 
+
+```{r, echo=FALSE, message = FALSE, results = FALSE, warning=FALSE}
+library(rpart)
+library(tree)
+seed.val<- 12345 
+```
+
+##### Fitting a Regression Tree
+This activity begins by creating a regression tree that predicts a baseball player's salary based on their number of hits and years in the league. A hit is when a batter has a successful attempt to reach a base.
+
+The data set has these possible predictors:
+"AtBat"     "Hits"      "HmRun"     "Runs"      "RBI"       "Walks"     "Years"     "CAtBat"    "CHits"    
+"CHmRun"    "CRuns"     "CRBI"      "CWalks"    "League"    "Division"  "PutOuts"   "Assists"   "Errors"   
+"NewLeague"
+
+The predicted variable:  "Salary".
+
+Q1 (2pts): Read in the file "baseball.csv" and assign the return to a variable bb.df. Then, remove all missing values (encoded as NA). You should have 263 rows after removing the missing data.
+
+```{r}
+bb.df <- read.csv("baseball.csv", sep=",", header=TRUE)
+bb.df <- na.omit(bb.df)
+```
+
+The rpart function is called to fit a regression tree model to the entire data set. The parameters are: a formula for the model, a "method" parameter with the value "anova", and a "data" parameter, which specifies the data set- bb.df in this case. Note the method="anova" parameter in the rpart function call. This indicates a regression tree, and analysis of variance will be used to make partitions (see ?rpart for more). 
+
+```{r}
+fit1 <- rpart(Salary ~ .,	method="anova", data=bb.df)
+```
+
+One advantage of tree models is that they are relatively easy to understand visually (when they are small, that is). The code below uses the plot and text functions to visualize the tree. You can resize the plots window to better see the details in this plot.
+
+```{r}
+plot(fit1, uniform=TRUE, 
+  	main="Regression Tree predicting Salary ")
+text(fit1, use.n=TRUE, all=TRUE, cex=.8)
+```
+
+Another way to view the tree structure as well as some statistics about how the splits were done is to "print" the fitted model, either by just typing the model in R or by executing a call to "print" and passing in the model object. 
+
+```{r}
+fit1
+```
+
+How to interpret the print out in the console below (you should be routing chunk output to the console instead of inline).
+Each line has this form:
+1- nodeID 
+2- name of variable used to split data and splitting criterion. Note that the rule in the diagram    applies to the left branch.
+3- number of data points in this node.
+4- SSE, or some measure of the "error" in the partition.
+5- the avergage value for the predicted variable in this node.
+6- an asterisk * appears for terminal (leaf) nodes.
+
+The "error", or deviance, is similar to cluster cohesiveness. The split which produces the best within-partition error vs between partition error is best. This ratio is what anova calculates.
+
+Q2 (3pts): How many nodes are in this tree? How many nodes are leaf (terminal) nodes? In the text printout, what is the node ID of the terminal node with the largest number of data points?
+
+> 19 in the tree, and 10 terminal nodes. 3) is the node ID.
+
+The above provides a textual output of the model. Each line shows: the node, the split criterion (the rule), number of data points at that branch, deviance, the overall prediction at that node. Leaf nodes are indicated by asterisks *. This output will be slightly different for classification trees, as you will see below.
+
+Q3 (4pts): What variable is used to perform the initial split of the data at the root of this tree to form nodes 2 and 3? What are the splitting criteria for nodes 2 and 3? How many data points are in each of these partitions?
+
+> Chits is the variable used to perform the initial split, and the splitting criteria for nodes 2 and 3 are Walks >=10 and Walks <61. They have 117 and 146 data points respectively.
+
+Q4 (2pts): What variable and rule is used to split the data in the left subtree at the next level (nodes 4 and 5)?
+
+> CRBI< 114.5.
+
+Notice that some variables are used more than once because they are the best at splitting the data at that particular level. 
+
+Q5 (2pts): How many unique variables are used in this model (look carefully)?
+
+> CHits, Walks, CRBI, AtBats, PutOuts, CRuns, and RBI. Seven.
+
+The path from the root to each node is a sequence of rules. For example, the path from the root to node 5 consists of this sequence of rules (the rule in the diagram is applied to the left branch):
+CHits<450, Walks<10 
+Node 5 predicts a salary of 548.5, on average.
+
+The path from the root to node 12 consists of this sequence of rules:
+CHits>=450, Walks<61, AtBat<395.5 
+Node 12 predicts a salary of 510.0, on average.
+
+Q6 (2pts): In the same format as above, list the rules that lead from the root to node 8. What salary does node 8 predict?
+
+>  CHits< 450, Walks>=10, CRBI< 114.5. Node 8 predicts the salary of $141.6343.
+
+##### Pruning an overgrown tree.
+
+One characteristic of tree models is that they often grow too large, and overfit the data. After fitting a tree, it is often necessary to "prune" the tree. Pruning is a way to adjust for overfitting. Remember that the more complex the model, the more likely it will be to overfit the data. We want a model that is sufficiently complex to model the trend or pattern in the data but not the noise. 
+
+The complexity parameter, cp, often referred to as "alpha", determines how the tree can be pruned. The complexity parameter is the amount by which splitting that node improved the relative error (the prediction error at a level of the tree). The default limit for cp is .01, where tree building stops.
+
+This statement produces a plot of the relative error vs the complexity parameter as the size of the tree grows. Size here means the number of splits, not the number of nodes.
+
+```{r}
+plotcp(fit1)
+```
+
+This plot can be interpreted in a similar way to the wss plot used to visualize an optimal number of clusters based on within cluster errors (wss). In that plot, there may be an inflection point, or "elbow", where adding more clusters does not reduce the error significantly. 
+
+This statement will display a table of cp values for each number of splits and the relative error.
+
+```{r}
+fit1$cptable
+```
+
+Notice that the plot does not match the output from the printcp call. They both show a point in the fit where adding more splits does not result in a significant reduction in error. They differ in that the plot starts at size 1, while the printcp output starts at nsplit=0.
+
+Q7 (2pts): Identify the number of splits where the size of the tree has a low error, and adding more tree structure is not improving the error very much. The plot displays a dotted line which is the suggested best point. What is that tree size? What is the cp value at that size in the printcp output?
+
+> 2 splits is where the size of the tree has a low error and adding more tree structure does not improve error very much. The best tree size is 2, and the CP value there is 0.04477601.
+
+
+This code uses the prune function with the best value of the complexity parameter to prune the tree. 
+
+```{r}
+best.cp <- 0.04477601
+fit2 <- prune(fit1, cp = best.cp)
+
+plot(fit2, uniform=TRUE, 
+  	main="Regression Tree predicting Salary ")
+text(fit2, use.n=TRUE, all=TRUE, cex=.8)
+```
+
+You can see a big change in the structure of the unpruned versus pruned tree. Now we have to compare their performance at prediction.
+
+Q8 (2pts): What were the variables used to make the first and second splits in the pruned tree? Are they the same as for the unpruned tree? Would you expect this?
+
+>
+
+#### Testing Tree Performance- RegressionTree.
+
+The tree models above were created using the entire Baseball dataset. Now we will test the predictive performance of an unpruned and pruned tree on training and testing sets. 
+
+This code chunk creates training and testing sets. It also creates a vector of the true salary values from the test set to use in evaluating the models' predictions.
+
+```{r}
+RNGversion("3.4.3")
+set.seed(seed.val)
+train.rows<-sample(1:nrow(bb.df), 200)
+train.data<-bb.df[train.rows,]
+test.data<-bb.df[-train.rows,]
+true.vals<-bb.df$Salary[-train.rows]
+```
+
+Next, fit a regression tree to the training data.
+
+Q9 (2pts): Write the following statement:
+Using the rpart function, fit a regression tree on the training subset (the data parameter). Use the same formula and method parameter as used for the call to fit1 above. Assign this call to the variable tree1.
+
+```{r}
+tree1 <- rpart(Salary ~ .,	method="anova", data=train.data)
+```
+
+These statements look at cost parameter (cp) values for several tree sizes:
+```{r}
+plotcp(tree1)
+tree1$cptable
+```
+Q10 (2pts): Based on the plot, find the tree size corresponds to the point where the relative error stops decreasing sharply. Reading from left to right, look for the first point that either touches or falls below the dotted line.
+
+> size= 3
+
+The next statements do the following steps:
+1. Get the best cp value to use for pruning.
+2. Assign to the variable tree2 a call to the prune function, passing in tree1 and setting the value of the cp parameter.
+3. Using the predict function, create predicitons for the unpruned and pruned trees and assign the calls to the variables tree1.pred and tree2.pred, respectively. 
+
+```{r}
+best.cp <- tree1$cptable[4]
+tree2<-  prune(tree1, cp = best.cp)
+
+tree1.pred<- predict(tree1, test.data, type="vector")
+tree2.pred<- predict(tree2, test.data, type="vector")
+```
+
+Now the models are compared by computing the following errors:
+Root mean squared error, RMSE
+Mean absolute error, MAE
+
+```{r}
+rmse1<- sqrt(mean((tree1.pred-true.vals) ^2))
+mae1<- mean(abs(tree1.pred-true.vals))
+
+rmse2<- sqrt(mean((tree2.pred-true.vals) ^2))
+mae2<- mean(abs(tree2.pred-true.vals))
+```
+
+This code plots a bar chart of the two error calculations for each tree.
+```{r}
+res<-c(rmse1, rmse2, mae1, mae2)
+dim(res) <- c(2,2)
+colnames(res) <- c("rmse","mae")
+colors <- c("grey45", "grey70")
+barplot(res, main="Prediction Errors", ylab = "Error", ylim=c(0, 400), cex.lab = 1.5, cex.main = 1.4, beside=TRUE, col=colors)
+
+legend("topright", legend=c("Tree 1", "Tree 2"),
+       fill=colors, cex=0.8)
+```
+
+Q11 (2pts): Summarize the results and explain why they agree or contradict what you would expect in terms of model overfitting and generalization.
+
+> The pruned tree performs better in both cases, which agrees with what I would expect in terms of overfitting and generalization because pruning trees reduces overfitting.
+
+### Classification Tree using the "tree" library.
+
+The "tree" library is also commonly used. You will explore it next.
+
+Consider the carseat_sales.csv data set:
+
+CompPrice: Price charged by competitor at each location.
+Income:    Community income level (in thousands of dollars).
+Advertising:  Local advertising budget for company at each location (in thousands of dollars).
+Population: Population size in region (in thousands).
+Price: Price company charges for car seats at each site.
+ShelveLoc: A factor with levels Bad, Good and Medium indicating the quality of the shelving location for the car seats at each site.
+Age: Average age of the local population.
+Education: A factor- Education level at each location.
+Urban: A factor with levels No and Yes to indicate whether the store is in an urban or rural location.
+US: A factor with levels No and Yes to indicate whether the store is in the US.
+
+You will build a classification tree to predict the level of Sales.
+
+Q12 (2pts): Read in the file "carseat_sales.csv" and assign it to sales.df. Then make the following variables factors: Sales, ShelveLoc, US, Urban, Education.
+
+```{r}
+sales.df<- read.csv("carseat_sales.csv")
+sales.df$Sales<-factor(sales.df$Sales)
+sales.df$ShelveLoc<-factor(sales.df$ShelveLoc)
+sales.df$US<-factor(sales.df$US)
+sales.df$Urban<-factor(sales.df$Urban)
+sales.df$Education<-factor(sales.df$Education)
+```
+
+Notice that the data types are both categorical and numeric. Tree models can accomodate both kinds of data types. 
+
+These statements fit a tree using Sales as the response variable and use all of the rest of the columns as predictors.
+A summary of the fitted model is printed.
+
+```{r}
+sales.tree1<- tree(Sales ~., sales.df)
+summary(sales.tree1)
+```
+
+Q13 (2pts): What is the predicted variable and what are its levels? What predictor variables were not included in the building of the model (note that this does not include the predicted variable)?
+
+> Sales is the predicted variable and its levels are High and Low. The predictor variables that weren't included are ShelveLoc, Price, Education, Population, Income, CompPrice, Advertising, and Age.
+
+The fit summary has some measures of fit accuracy.
+
+Deviance is one measure of goodness of fit. It is like the RSS- the squared difference between predicted and actual outcomes. Think of the purely overfitted tree. This tree fits the data perfectly as it has one leaf node for each data point. The difference in fit between the purely overfit tree and the tree you just fitted is the deviance. Higher numbers are worse fit.
+
+How to interpret the deviance number? 
+It is not good to judge any model on a single number. There are several aspects of a model that make it useful, including what it can tell up about the predictors. In terms of goodness of fit, the deviance should be judged relative to other models on the same data. You can think of deviance like the distance of the data in the partition from its "center".
+
+Remember that we are after a balance between a good fit to the data and a generalized model.
+
+The misclassification rate in this case is the training error rate.
+
+This code plots the tree and adds labels with the text function.
+
+```{r}
+plot(sales.tree1)
+text(sales.tree1) 
+```
+
+This prints out the tree nodes and their relevant info. This is a somewhat large print out that you would not include in a knitted presentation. We call for it here for academic purposes.
+
+```{r}
+sales.tree1
+```
+
+Each line of this printout shows:
+node, split criterion (rule), number of data points at that branch, deviance, the overall prediction (High/Low), and the ratio of High to Low observations- in other words, the probability of the outcomes on that partition..
+
+Q14 (4pts): According to this model, what predictor was chosen to make the initial split of the data? What are the levels of this predictor? What levels of this variable are included in the left subtree? in the right subtree?
+
+> ShelveLoc and its levels are Good, Medium, and Bad. Left subtree has Good, and right has Bad and Medium.
+
+Q15 (4pts): Refer to node 123 in the tree. What is the rule used to create this partition (only the rule for this partition, not all rules from the root)? Is this a leaf node or an internal node? What is the prediction of this node? Approximately what is the percentage of data points in this partition that are actually classified the same as the node's predicited value?
+
+>rule=Price > 117   ,leaf node=yes ,predicts=Low ,percent agreement with Low= 28.571%.
+
+#### Evaluate predictive performance
+
+These statements use half the data for training and half for testing by random sampling. Then creates a vector of true labels for use in evaluating the models' predictions.
+
+```{r}
+RNGversion("3.4.3")
+set.seed(seed.val)
+train.rows<-sample(1:nrow(sales.df), 200)
+test.data<-sales.df[-train.rows,]
+true.labels<-sales.df$Sales[-train.rows]
+```
+
+These statements fit a tree to the training subset. Next, the call is made to the predict function to create predicitons on the test set. Note the use of the parameter: type=class as this model is a classifier and should produce a categorical outcome. 
+
+```{r}
+sales.tree2<- tree(Sales ~., sales.df, subset=train.rows)
+tree2.pred<- predict(sales.tree2, test.data, type="class")
+```
+
+Q16 (2pts): Now create the confusion matrix with the table function using the predicted label vector from the step above and the true label vector. Print the table.
+
+```{r}
+conf.matrix <- table(tree2.pred, true.labels)
+conf.matrix
+```
+
+Q17 (2pts): What is the misclassification rate?
+
+> 54 / 200 = 27%
+
+#### Pruning
+
+In order to do some pruning on sales.tree2, use the cv.tree function to find the best tree size. This function will use the misclassification rate on many tree sizes and report the best sizes and the deviance for each size. The FUN parameter specifies misclassification as the criterion rather than node deviance. That is how the sizes are picked. We will then use the deviance to pick the best size.
+
+```{r}
+RNGversion("3.4.3")
+set.seed(seed.val)
+cv.tree1<-cv.tree(sales.tree2, FUN=prune.misclass)
+names(cv.tree1)
+```
+
+The values available in the object returned from the call to cv.tree:
+size- the size of each tree that was considered
+dev- cross validation error rate
+k- the alpha parameter (complexity parameter)
+
+This code plots the errors as a function of tree size.
+
+```{r}
+plot(cv.tree1$size, cv.tree1$dev, type="b")
+```
+
+Q18 (2pts): Based on this plot, which size tree has the lowest overall deviance?
+
+> size=5
+
+These statements use the function prune.misclass to prune the tree we fit using the best size as a stopping criterion.
+
+```{r}
+pruned.tree1<-prune.misclass(sales.tree2, best=5)
+plot(pruned.tree1)
+text(pruned.tree1)
+```
+
+Now test the accuracy of the pruned tree. Calls predict on the pruned tree and displays the confusion matrix.
+
+```{r}
+prune.tree1.pred<- predict(pruned.tree1, test.data, type="class")
+table(prune.tree1.pred, true.labels)
+```
+
+Q19 (2pts): Compare the misclassification rates between the pruned tree, pruned.tree1, with the initial tree, sales.tree2. Fill in the table below.
+
+| Model      | Misc Rate | 
+| ----------- | ----------- | 
+| sales.tree2      | 27  %| 
+| pruned.tree1   | 29.5  %| 
+
+Q20 (2pts): Which model has the lower misclassification rate? Is the difference very large? Briefly explain this result in terms of model complexity and if overfitting occurred.
+
+> sales.tree2 has the lower misclassification rate. The difference isn't very large, only 2.5%. This means that the sales.tree2 model fits the data better than the pruned version, which means that overfitting likely occurred.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

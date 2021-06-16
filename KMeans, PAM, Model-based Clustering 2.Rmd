@@ -1,0 +1,230 @@
+---
+title: "Lab5-1 Clustering"
+author: "Aaron Tsui"
+output: html_document
+---
+
+### Lab 5-1: Clustering with K-means and Model-based Techniques. (23 questions, 82 points)
+
+##### Examine and prepare the data.
+
+In this activity, you will cluster data from the educational domain. The data file, CourseAttendance.csv, contains data about students in an introductory programming course. This analysis is to explore these data to see if there are any "natural" groupings. If there are groupings, what kind of attendance profiles, lecture and discussion, do we see in the groups, and how do the groups compare in terms of final exam scores. 
+
+The data set contains the following variables:
+
+ CLASS_LVL : numeric, year in school
+ GENDER    : numeric, 1=female, 2=male
+ MAJOR     : numeric, twelve various undergrad majors
+ PREV      : numeric, level of previous programming experience
+ LECATTEND : numeric, lecture attendence, 1=never, 2= sometimes, 3=always
+ DISCATTEND: numeric, discussion attendence, 1=never, 2= sometimes, 3=always
+ FINAL     : numeric, final exam score
+ FINALQ    : numeric, final exam score quartile, 1=lowest, 4=highest
+
+Q1(5pts): Write a series of R statements which do the following:
+
+1- Read in the data from the file assigning it to a variable called "data.df". 
+2- Change the FINALQ column from numeric to factor, with labels "1st", "2nd", "3rd", "4th".
+   Note- use the "labels" parameter, not "levels".
+3- Create a subset of the data frame for clustering called subset.df which does not include the FINAL and FINALQ columns (that is, columns 1 to 6).
+4- Create the variable "exam.labels" and assign to it the FINALQ column in the data frame data.df. Create the variable "exam.scores" and assign to it the FINAL column.
+
+```{r}
+data.df <- read.csv("CourseAttendance.csv", sep=",", header=TRUE)
+data.df$FINALQ = factor(data.df$FINALQ, labels = c("1st", "2nd", "3rd", "4th"))
+subset.df <- subset(data.df, select = -c(7,8))
+exam.labels <- data.df$FINALQ
+exam.scores <- data.df$FINAL
+```
+
+#### Part 1: Clustering with K-means
+
+You will use the following function to create a plot of within sum of squares.
+
+```{r}
+wssplot <- function(data, nc=15, seed=1234){
+               wss <- (nrow(data)-1)*sum(apply(data,2,var))
+               for (i in 2:nc){
+                    set.seed(seed)
+                    wss[i] <- sum(kmeans(data, centers=i)$withinss)}
+                plot(1:nc, wss, type="b", xlab="Number of Clusters",
+                     ylab="Within groups sum of squares")
+           }
+```
+                     
+Q2(2pts): Generate a wss plot on the subset.df data set. State the optimal number of clusters and why the plot supports your conclusion. 
+
+```{r}
+wssplot(subset.df)
+   
+```
+
+Q3(2pts): Based on the plot you generated, state the optimal number of clusters and why the plot supports your conclusion. 
+
+> The optimal # of clusters is 3 because the "elbow" of the graph is at 3 clusters.
+
+
+Q4(2pts): Use the NbClust function to determine the optimal number of clusters.
+The data is the subset dataframe, the minimum number of clusters is 2, the max is 10, the method parameter should be "kmeans". Assign the return of the call to NcClust to a variable called "nc".
+Note: the nbClust function can take several minutes to complete- wait until the stop sign disappears and you see the cursor, >, re-appear in the console.
+
+```{r}
+library(NbClust)
+nc <- NbClust(subset.df, min.nc=2, max.nc=10, method="kmeans")
+```
+
+Q5(2pts): What does this function return as the optimal number of clusters?
+
+> Three.
+
+Q6(2pts): Create a variable "cluster.assignments" and assign to it the vector of cluster assignments made by the NbClust function. This is the attribute that has the best partition in the object returned from NbClust. To see the exact name, look in the Value section of the documentation page for the NbClust function.
+
+```{r}
+cluster.assignments <- nc$Best.partition
+```
+
+#### Evaluating clusters with respect to final exam, attendance
+
+Now examine the clusters created by the NbClust function to see if there are patterns in lecture and discussion attendance, and if the clusters have any relationship to final exam scores.
+
+Q7(4pts): Examine the proportion of lecture attendance for each cluster. Create a contingency table called "cont.table". Use the LECATTEND column from the data.df dataset and the cluster assignments variable you created above in the table. Display the table. Then, using the prop.table function, display the proportions of lecture attendance across the clusters (the row proportions), and the proportions within each cluster (the column proportions). Run a chi-square test on the table for dependencies.  
+
+```{r}
+cont.table <- table(data.df$LECATTEND, cluster.assignments)
+cont.table
+prop.table(cont.table, margin = c(1))
+prop.table(cont.table, margin = c(2))
+chisq.test(cont.table)
+```
+
+Q8(4pts): Briefly summarize the proportions across the clusters. Include the results of the chi-square test and what it implies about a relationship between lecture attendance and cluster membership.
+
+> Cluster 2 proportions for the rows are much higher than the other clusters. Cluster 3 proportions for the columns are higher than the other clusters, but Cluster 2 proportions have higher variance than Cluster 3 proportions. The p-value of the chisq test is significantly lower than 0.05, which means the relationship between lecture attendance and cluster membership is strong.
+
+
+Q9(4pts): Examine the proportion of discussion attendance for each cluster. Create a contingency table called "cont.table". Use the DISCATTEND column from the data.df data set and the cluster assignments in the table. Display the table. Then, display the proportions of discussion attendance across the clusters (the row proportions), and the proportions whithin each cluster (the column proportions). Run a chi-square test on the table for dependencies. 
+
+```{r}
+cont.table <- table(data.df$DISCATTEND, cluster.assignments)
+cont.table
+prop.table(cont.table, margin = c(1))
+prop.table(cont.table, margin = c(2))
+chisq.test(cont.table)
+```
+
+Q10(4pts): Briefly summarize the proportions across the clusters. Include the results of the chi-square test and what it implies about a relationship between discussion attendance and cluster membership.
+
+> The Cluster 2 proportions for the rows are much higher than the others, and all three clusters have relatively low variance for the rows. For the column proportions all three clusters have one proportion that is significantly higher than the other 2 proportions, but the highest proportion of all the clusters is the highest proportion of CLuster 2, 0.5225806. The p-value of the chisq test is significantly lower than 0.05, which means the relationship between discussion attendance and cluster membership is strong, but less strong than the chisq test from Q7.
+
+Q11(4pts): Examine the proportion of final exam quartiles for each cluster. Create a contingency table called "cont.table". Use the exam.labels and cluster assignments in the table. Display the table. Then, display the proportions of each exam quartile across the clusters (the row proportions), and the proportions whithin each cluster (the column proportions). Briefly summarize the proportions of the lowest and highest exam quartiles across the clusters. 
+
+```{r}
+cont.table <- table(exam.labels, cluster.assignments)
+cont.table
+prop.table(cont.table, margin = c(1))
+prop.table(cont.table, margin = c(2))
+chisq.test(cont.table)
+```
+
+Q12(4pts): Briefly summarize the proportions of the lowest and highest exam quartiles across the clusters. 
+
+> THe Cluster 2 proportions for the rows are much higher than the others, whereas the Cluster 1 and 2 proportions for the columns are relatively consistent as compared to the Cluster 3 proportions for the columns. The p-value of the chisq test is significantly lower than 0.05, which means the relationship between discussion attendance and cluster membership is strong, but less strong than the chisq test from Q9.
+
+#####Graph the average final exam scores for each cluster. 
+
+Q13(2pts): Create a variable called "exam.mean". Assign to this variable the mean of the final exam scores for each cluster. Use the vector "exam.scores" you created earlier and the cluster.assignments variable. Use the "tapply" function to apply the "mean" function to the exam scores, grouped by cluster.
+
+```{r}
+exam.mean <- tapply(exam.scores, cluster.assignments, FUN = "mean")
+```
+
+Q14(2pts): Use the "barplot" function to plot the means for each cluster (the "exam.mean" vector). Add a title to the plot "Mean Final Exam Scores per Cluster", a title for the horizontal axis "cluster", and a title for the vertical axis "mean score".
+```{r}
+barplot(exam.mean, main = "Mean Final Exam Scores per Cluster", xlab = "cluster", ylab = "mean score")
+
+```
+
+Q15(5pts): Briefy summarize your findings about the clustering in general. Then summarize what you found about lecture and discussion attendance as it related to the clusters. Finally, summarize what you found about final exam scores and the clusters.
+
+> The optimal # of clusters is 3 because the "elbow" of the graph is at 3 clusters. The lecture and attendence proportions of Cluster 2 across their respective clusters were the highest. The Mean Final Exam Scores for Cluster 2 are the highest, whereas the ones for Cluster 3 are the lowest.
+
+
+#### Model-based Clustering
+
+#### Part 2: Model-based Clustering with the mclust Library
+
+Now we'll use the Mclust function to take a model-based approach to these data. It is always a good idea to use several techniques in your analysis.
+
+Q16(4pts): Run the Mclust function on the subset.df dataset and assign it to a variable called "model.cluster". Call the "summary" function to display the cluster info. Plot the models and their BIC scores. The call to plot uses the variable model.cluster as the first argument, the data is subset.data, and use what="BIC" as the last argument. 
+```{r}
+library(mclust)
+model.cluster <- Mclust(subset.df)
+summary(model.cluster)
+plot(model.cluster, subset.df, what= "BIC")
+```
+
+NOTE: This plot will probably not display well in the "Plots" tab on the lower right unless you make that window large. To see the plot well, pipe the output of the plot function to an image file, such as a jpeg. The following code will do this:
+jpeg("MYPLOT.jpg")
+plot(your parameters)
+dev.off()
+
+This code will create the file "MYPLOT" in your working directory (you can give another path if you wish, and name the file what you wish). The call to dev.off returns the output to the normal setting.
+
+Q17(4pts): Assign to a variable "cluster.assignments" the cluster assignments from the Mclust object. This is the "classification" attribute. Then use the "tapply" function to apply the "mean" function to the exam.scores grouping by the cluster assignments. This should display a vector of 2 values which are the mean exam scores for each of the 2 clusters.
+
+```{r}
+cluster.assignments <- model.cluster$classification
+tapply(exam.scores, cluster.assignments,  FUN = "mean")
+
+```
+
+Q18(4pts): Create a contingency table using the LECATTEND column from the original dataset, data.df, and the cluster assignments variable you just created. Print the table, then, using the prop.table function, display the row and column proportions. Finally, run a chi-square test on the table.
+
+```{r}
+cont.table <- table(data.df$LECATTEND, cluster.assignments)
+cont.table
+prop.table(cont.table, margin = c(1))
+prop.table(cont.table, margin = c(2))
+chisq.test(cont.table)
+
+```
+
+Q19(5pts): Briefly summarize the results from the model-based clustering: What does the BIC plot show about the models and number of clusters? What do the mean exam scores say about the clusters? How does the lecture attandance relate to the mean exam scores in the cluster assignments? What does the chi-square test say about the contingency table?
+
+> The BIC plot shows that as the # of clusters increases from 1 to 3, BIC increases, but after 3 clusters, BIC stays relatively the same; only increasing very slightly as clusters increase. The mean exam scores are relatively close to the cluster assignments. The lecture attendance and cluster assignments have a strong relationship for Clusters 1 and 2. The chisq test says that the cont.table is reliable, since the p-value of the chisq test is far lower than 0.05. 
+
+
+Q20(4pts): Call Mclust using subset.df, but specify 3 clusters by passing in the parameter G=3. Print the summary of the Mclust object and plot the BIC score (you will only see one set of models). 
+
+```{r}
+model.cluster <- Mclust(subset.df, G=3)
+summary(model.cluster)
+plot(model.cluster, what= "BIC")
+```
+See the previous note about outputting a plot to an image file so you can see it better.
+
+Q21(4pts): As you did in Q17 but using the new model you created above, assign to a variable "cluster.assignments" the cluster assignments from the Mclust object. This is the "classification" attribute. Then use the "tapply" function to apply the "mean" function to the exam.scores grouping by the cluster assignments. This should display a vector of 6 values which are the mean exam scores for each of the 6 clusters.
+```{r}
+cluster.assignments <- model.cluster$classification
+tapply(exam.scores, cluster.assignments,  FUN = "mean")
+
+```
+
+Q22(4pts): As you did in Q18 but using the new model you created above, create a contingency table using the LECATTEND column from the original dataset, data.df, and the cluster assignments variable you just created. Print the table, then, using the prop.table function, display the row and column proportions. Finally, run a chi-square test on the table.
+```{r}
+
+cont.table <- table(data.df$LECATTEND, cluster.assignments)
+cont.table
+prop.table(cont.table, margin = c(1))
+prop.table(cont.table, margin = c(2))
+chisq.test(cont.table)
+
+
+
+```
+
+Q23(5pts): Briefly summarize the relationship between lecture attendance and final exam scores across the three clusters. Does this agree with the k-means results above? 
+
+> The proportion of lecture attendance in each respective cluster is consistent, with Cluster 3 being the most consistent and CLuster 1 being the least consistent of the three clusters. Yes, this agrees with the k-means results above.
+
+
